@@ -1,10 +1,13 @@
 from module.base.button import ButtonGrid
+from module.base.decorator import cached_property
 from module.base.utils import *
+import module.config.server as server
 from module.handler.assets import AUTO_SEARCH_MENU_EXIT
 from module.statistics.assets import CAMPAIGN_BONUS
 from module.statistics.get_items import ITEM_GROUP, GetItemsStatistics
 from module.statistics.item import Item
 from module.statistics.utils import *
+from module.ocr.ocr import Ocr
 
 
 class BonusItem(Item):
@@ -13,13 +16,21 @@ class BonusItem(Item):
 
 
 class CampaignBonusStatistics(GetItemsStatistics):
+    @cached_property
+    def ocr_object(self):
+        return Ocr(CAMPAIGN_BONUS, lang='cnocr', threshold=128, name='REWARDS_OCR')
+
     def appear_on(self, image):
-        if AUTO_SEARCH_MENU_EXIT.match(image, offset=(200, 20)) \
-                and CAMPAIGN_BONUS.match(image, offset=(20, 500)):
-            return True
-
-        return False
-
+        #Unsure if other servers need an updated version too, or if previous worked
+        if server.server == 'en':
+            if AUTO_SEARCH_MENU_EXIT.match(image, offset=(200,20)):
+                return "Rewards" in self.ocr_object.ocr(image)
+        else:
+            if AUTO_SEARCH_MENU_EXIT.match(image, offset=(200, 20)) \
+                    and CAMPAIGN_BONUS.match(image, offset=(20, 500)):
+                return True
+            return False
+        
     def _stats_get_items_load(self, image):
         ITEM_GROUP.item_class = BonusItem
         ITEM_GROUP.similarity = 0.85

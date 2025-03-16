@@ -1,5 +1,7 @@
 import os
 
+from datetime import datetime
+
 import cv2
 import numpy as np
 from PIL import Image
@@ -234,4 +236,14 @@ class AlOcr(CnOcr):
         img_list = [(self._preprocess_img_array(img) * 255.0).astype(np.uint8) for img in img_list]
         img_list, img_widths = self._pad_arrays(img_list)
         image = cv2.hconcat(img_list)[0, :, :]
-        Image.fromarray(image).show()
+        #only popup image
+        #Image.fromarray(image).show()
+        #save images to folder
+        # output_dir = "debugphoto"
+        # if not os.path.exists(output_dir):
+        #     os.makedirs(output_dir)
+        # timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        # output_path = os.path.join(output_dir, f"debug_{timestamp}.png")
+        # cv2.imwrite(output_path, image)
+
+        # print(f"Debug image saved to: {output_path}")
