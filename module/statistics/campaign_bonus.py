@@ -1,10 +1,12 @@
 from module.base.button import ButtonGrid
+from module.base.decorator import cached_property
 from module.base.utils import *
 from module.handler.assets import AUTO_SEARCH_MENU_EXIT
 from module.statistics.assets import CAMPAIGN_BONUS
 from module.statistics.get_items import ITEM_GROUP, GetItemsStatistics
 from module.statistics.item import Item
 from module.statistics.utils import *
+from module.ocr.ocr import Ocr  # Import OCR for text detection
 
 
 class BonusItem(Item):
@@ -13,12 +15,27 @@ class BonusItem(Item):
 
 
 class CampaignBonusStatistics(GetItemsStatistics):
-    def appear_on(self, image):
-        if AUTO_SEARCH_MENU_EXIT.match(image, offset=(200, 20)) \
-                and CAMPAIGN_BONUS.match(image, offset=(20, 500)):
-            return True
+    @cached_property
+    def ocr_object(self):
+        # Initialize OCR for detecting the "Rewards" text
+        return Ocr(lang='cnocr', threshold=128, name='REWARDS_OCR')
 
-        return False
+    def appear_on(self, image):
+        """
+        Check if the campaign bonus screen is visible by:
+        1. Ensuring the AUTO_SEARCH_MENU_EXIT button is present.
+        2. Using OCR to detect the "Rewards" text within the CAMPAIGN_BONUS area.
+        """
+        if not AUTO_SEARCH_MENU_EXIT.match(image, offset=(200, 20)):
+            return False
+
+        # Crop the image to the CAMPAIGN_BONUS area
+        campaign_bonus_area = CAMPAIGN_BONUS.button
+        cropped_image = crop(image, campaign_bonus_area)
+
+        # Use OCR to detect the "Rewards" text in the cropped image
+        ocr_result = self.ocr_object.ocr(cropped_image)
+        return "Rewards" in ocr_result  # Partial match
 
     def _stats_get_items_load(self, image):
         ITEM_GROUP.item_class = BonusItem
