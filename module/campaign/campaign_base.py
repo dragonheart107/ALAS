@@ -129,6 +129,7 @@ class CampaignBase(CampaignUI, Map, AutoSearchCombat):
         if not self.map_is_auto_search:
             self.handle_map_fleet_lock()
             self.map_init(self.MAP)
+            self.get_coin
         else:
             self.map = self.MAP
             self.battle_count = 0
