@@ -1,6 +1,7 @@
 from module.base.decorator import Config, cached_property
 from module.campaign.campaign_ui import CampaignUI
 from module.combat.auto_search_combat import AutoSearchCombat
+from module.campaign.campaign_status import get_coin
 from module.exception import CampaignEnd, MapEnemyMoved, ScriptError
 from module.logger import logger
 from module.map.map import Map
@@ -143,6 +144,7 @@ class CampaignBase(CampaignUI, Map, AutoSearchCombat):
                     self.auto_search_execute_a_battle()
             except CampaignEnd:
                 logger.hr('Campaign end')
+                self.get_coin()
                 return True
 
         # Exception

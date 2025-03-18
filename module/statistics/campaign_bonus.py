@@ -26,8 +26,8 @@ class CampaignBonusStatistics(GetItemsStatistics):
         1. Ensuring the AUTO_SEARCH_MENU_EXIT button is present.
         2. Using OCR to detect the "Rewards" text within the CAMPAIGN_BONUS area.
         """
-        if not AUTO_SEARCH_MENU_EXIT.match(image, offset=(200, 20)):
-            return False
+        if AUTO_SEARCH_MENU_EXIT.match(image, offset=(200, 20)):
+            return True
 
         # Crop the image to the CAMPAIGN_BONUS area
         campaign_bonus_area = CAMPAIGN_BONUS.button
