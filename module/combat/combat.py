@@ -375,11 +375,17 @@ class Combat(Level, HPBalancer, Retirement, SubmarineCall, CombatAuto, CombatMan
             self.device.click(BATTLE_STATUS_D)
 
             if self.appear(OPTS_INFO_D, interval=self.battle_status_click_interval):
-                self.device.click(OPTS_INFO_D)               
-            # Click BATTLE_STATUS_D again
-            self.device.click(BATTLE_STATUS_D)
-            return True
+                logger.warning('OPTS_INFO_D popup appeared')
+                self.device.click(OPTS_INFO_D)
+                # After OPTS_INFO_D, BATTLE_STATUS_D again
+                if self.appear(BATTLE_STATUS_D, interval=self.battle_status_click_interval):
+                    logger.warning('Battle Status D reappeared')
+                    self.device.click(BATTLE_STATUS_D)
+                    return True
+
+            return False
         
+
         return False
 
     def handle_get_items(self, drop=None):
