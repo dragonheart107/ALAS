@@ -10,6 +10,7 @@ config/tmp*
 !config/template*.json
 *.pyw
 dev_tools/debug_tools
+dev_tools/dropstats/output.txt  
 .idea
 /screenshots
 /campaign/test/
