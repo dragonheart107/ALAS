@@ -7,7 +7,7 @@ from module.statistics.assets import CAMPAIGN_BONUS
 from module.statistics.get_items import ITEM_GROUP, GetItemsStatistics
 from module.statistics.item import Item
 from module.statistics.utils import *
-from module.ocr.ocr import Ocr  # Import OCR for text detection
+from module.ocr.ocr import Ocr
 
 
 class BonusItem(Item):
@@ -24,17 +24,14 @@ class CampaignBonusStatistics(GetItemsStatistics):
         #Unsure if other servers need an updated version too, or if previous worked
         if server.server == 'en':
             if AUTO_SEARCH_MENU_EXIT.appear_on(image):
-
-            # Crop image to CAMPAIGN_BONUS area, since there are multiple areas with "Rewards"
-                campaign_bonus_area = CAMPAIGN_BONUS.button
-            ocr_result = self.ocr_object.ocr(image)
+                ocr_result = self.ocr_object.ocr(image)
             return "Rewards" in ocr_result
         else:
             if AUTO_SEARCH_MENU_EXIT.match(image, offset=(200, 20)) \
                     and CAMPAIGN_BONUS.match(image, offset=(20, 500)):
                 return True
             return False
-
+        
     def _stats_get_items_load(self, image):
         ITEM_GROUP.item_class = BonusItem
         ITEM_GROUP.similarity = 0.85
