@@ -2,6 +2,7 @@ import numpy as np
 
 from module.base.button import ButtonGrid
 from module.base.decorator import Config
+from module.campaign.campaign_status import CampaignStatus
 from module.handler.assets import *
 from module.handler.enemy_searching import EnemySearchingHandler
 from module.logger import logger
@@ -254,6 +255,7 @@ class AutoSearchHandler(EnemySearchingHandler):
 
             # End
             if self.is_in_stage():
+                self.get_coin()
                 break
 
         return True
