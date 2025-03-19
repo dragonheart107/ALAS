@@ -129,6 +129,7 @@ class CampaignBase(CampaignUI, Map, AutoSearchCombat):
         if not self.map_is_auto_search:
             self.handle_map_fleet_lock()
             self.map_init(self.MAP)
+            self.device.sleep((0.25, 0.5))
             self.get_coin
         else:
             self.map = self.MAP
@@ -145,6 +146,7 @@ class CampaignBase(CampaignUI, Map, AutoSearchCombat):
                     self.auto_search_execute_a_battle()
             except CampaignEnd:
                 logger.hr('Campaign end')
+                self.device.sleep((0.25, 0.5))
                 self.get_coin()
                 return True
 

@@ -27,11 +27,14 @@ def search_ocr_in_folder(folder_path, output_file):
                 for line in lines:
                     line = line.strip()
 
-                    # Check for 'OCR_OIL' or 'OCR_COIN'
-                    if 'OCR_OIL' in line or 'OCR_COIN' in line:
+                    # # Check for 'OCR_OIL' or 'OCR_COIN'
+                    # if 'OCR_OIL' in line or 'OCR_COIN' in line:
+                    #     ocr_lines.append(line)
+                    #     # Update the maximum OCR line length
+                    #     max_ocr_length = max(max_ocr_length, len(line))
+                    if 'OCR_COIN' in line:
                         ocr_lines.append(line)
-                        # Update the maximum OCR line length
-                        max_ocr_length = max(max_ocr_length, len(line))
+                        max_ocr_length = max(max_ocr_length, len(line))   
 
                     # Check for headers
                     elif is_header(line):
