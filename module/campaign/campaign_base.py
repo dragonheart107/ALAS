@@ -121,6 +121,7 @@ class CampaignBase(CampaignUI, Map, AutoSearchCombat):
         logger.hr(self.ENTRANCE, level=2)
 
         # Enter map
+        self.get_coin()
         self.emotion.check_reduce(self._map_battle)
         self.ENTRANCE.area = self.ENTRANCE.button
         self.enter_map(self.ENTRANCE, mode=self.config.Campaign_Mode)
@@ -129,8 +130,6 @@ class CampaignBase(CampaignUI, Map, AutoSearchCombat):
         if not self.map_is_auto_search:
             self.handle_map_fleet_lock()
             self.map_init(self.MAP)
-            self.device.sleep((0.25, 0.5))
-            self.get_coin
         else:
             self.map = self.MAP
             self.battle_count = 0
@@ -142,12 +141,17 @@ class CampaignBase(CampaignUI, Map, AutoSearchCombat):
             try:
                 if not self.map_is_auto_search:
                     self.execute_a_battle()
+
+                    not_auto = True
                 else:
                     self.auto_search_execute_a_battle()
+
+                    not_auto = False
+
             except CampaignEnd:
                 logger.hr('Campaign end')
-                self.device.sleep((0.25, 0.5))
-                self.get_coin()
+                if not_auto:
+                    self.get_coin()
                 return True
 
         # Exception
