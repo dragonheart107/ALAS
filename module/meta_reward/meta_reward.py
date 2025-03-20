@@ -168,7 +168,7 @@ class BeaconReward(Combat, UI):
                 logger.info('meta_wait_reward_page ends at reward red dot')
                 break
 
-    def run(self, skip_first_screenshot=True):
+    def run(self):
         if self.config.SERVER in ['cn', 'en', 'jp']:
             pass
         else:
@@ -177,13 +177,9 @@ class BeaconReward(Combat, UI):
 
         self.ui_ensure(page_meta)
         self.meta_wait_reward_page()
-        if skip_first_screenshot:
-            skip_first_screenshot = False
-        else:
-            self.device.screenshot()
         # Sync rewards
         # "sync" is the period that you gather meta points to 100% and get a meta ship
-        if self.meta_sync_notice_appear():
+        if self.meta_sync_notice_appear(interval=10):
             logger.info('Found meta sync red dot')
             self.meta_sync_receive()
         else:
