@@ -373,18 +373,7 @@ class Combat(Level, HPBalancer, Retirement, SubmarineCall, CombatAuto, CombatMan
             else:
                 self.device.sleep((0.25, 0.5))
             self.device.click(BATTLE_STATUS_D)
-
-            if self.appear(OPTS_INFO_D, interval=self.battle_status_click_interval):
-                logger.warning('OPTS_INFO_D popup appeared')
-                self.device.click(OPTS_INFO_D)
-                # After OPTS_INFO_D, BATTLE_STATUS_D again
-                if self.appear(BATTLE_STATUS_D, interval=self.battle_status_click_interval):
-                    logger.warning('Battle Status D reappeared')
-                    self.device.click(BATTLE_STATUS_D)
-                    return True
-
-            return False
-        
+            return True
 
         return False
 
@@ -439,7 +428,19 @@ class Combat(Level, HPBalancer, Retirement, SubmarineCall, CombatAuto, CombatMan
         if self.appear_then_click(EXP_INFO_B):
             self.device.sleep((0.25, 0.5))
             return True
-
+        if self.appear_then_click(EXP_INFO_C):
+            self.device.sleep((0.25, 0.5))
+            return True
+        if self.appear_then_click(EXP_INFO_D):
+            self.device.sleep((0.25, 0.5))
+            if self.appear(OPTS_INFO_D, interval=1):
+                logger.warning('OPTS_INFO_D popup appeared')
+                self.device.click(OPTS_INFO_D)
+                if self.appear_then_click(EXP_INFO_D):
+                    self.device.sleep((0.25, 0.5))
+                    return True
+                return False
+            return False
         return False
 
     def handle_get_ship(self, drop=None):
