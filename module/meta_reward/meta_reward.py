@@ -70,7 +70,7 @@ class BeaconReward(Combat, UI):
         logger.info(f'Meta reward receive finished, received={received}')
         return received
 
-    def meta_sync_notice_appear(self, interval):
+    def meta_sync_notice_appear(self, interval=0):
         """
         "sync" is the period that you gather meta points to 100% and get a meta ship
 
