@@ -105,8 +105,6 @@ class BeaconReward(Combat, UI):
                 skip_first_screenshot = False
             else:
                 self.device.screenshot()
-            self.device.sleep(5)
-
             # End
             # Sync progress >= 100%
             if self.appear(REWARD_ENTER, offset=(20, 20)):
@@ -178,6 +176,8 @@ class BeaconReward(Combat, UI):
 
         self.ui_ensure(page_meta)
         self.meta_wait_reward_page()
+        self.device.sleep(5)
+
         # Sync rewards
         # "sync" is the period that you gather meta points to 100% and get a meta ship
         if self.meta_sync_notice_appear(interval=10):
