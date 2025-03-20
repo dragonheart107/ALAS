@@ -105,6 +105,7 @@ class BeaconReward(Combat, UI):
                 skip_first_screenshot = False
             else:
                 self.device.screenshot()
+            self.device.sleep(5)
 
             # End
             # Sync progress >= 100%
