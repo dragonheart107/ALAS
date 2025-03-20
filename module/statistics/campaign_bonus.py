@@ -23,14 +23,13 @@ class CampaignBonusStatistics(GetItemsStatistics):
     def appear_on(self, image):
         #Unsure if other servers need an updated version too, or if previous worked
         if server.server == 'en':
-            if AUTO_SEARCH_MENU_EXIT.appear_on(image):
-                ocr_result = self.ocr_object.ocr(image)
-            return "Rewards" in ocr_result
+            if AUTO_SEARCH_MENU_EXIT.match(image, offset=(200,20)):
+                return "Rewards" in self.ocr_object.ocr(image)
         else:
-            if AUTO_SEARCH_MENU_EXIT.match(image, offset=(200, 20)) \
-                    and CAMPAIGN_BONUS.match(image, offset=(20, 500)):
-                return True
-            return False
+             if AUTO_SEARCH_MENU_EXIT.match(image, offset=(200, 20)) \
+                     and CAMPAIGN_BONUS.match(image, offset=(20, 500)):
+                 return True
+             return False
 
     def _stats_get_items_load(self, image):
         ITEM_GROUP.item_class = BonusItem
