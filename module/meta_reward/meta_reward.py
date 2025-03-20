@@ -152,13 +152,13 @@ class BeaconReward(Combat, UI):
             if timeout.reached():
                 logger.warning(f'meta_wait_reward_page timeout')
                 break
-            if self.appear(REWARD_ENTER, offset=(20, 20)):
+            if self.appear(REWARD_ENTER, offset=(20, 20),interval=1):
                 logger.info(f'meta_wait_reward_page ends at {REWARD_ENTER}')
                 break
-            if self.appear(SYNC_ENTER, offset=(20, 20)):
+            if self.appear(SYNC_ENTER, offset=(20, 20), interval=1):
                 logger.info(f'meta_wait_reward_page ends at {SYNC_ENTER}')
                 break
-            if self.appear(SYNC_TAP, offset=(20, 20)):
+            if self.appear(SYNC_TAP, offset=(20, 20),interval=1):
                 logger.info(f'meta_wait_reward_page ends at {SYNC_TAP}')
                 break
             if self.meta_sync_notice_appear():
