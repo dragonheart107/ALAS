@@ -428,8 +428,25 @@ class Combat(Level, HPBalancer, Retirement, SubmarineCall, CombatAuto, CombatMan
         if self.appear_then_click(EXP_INFO_B):
             self.device.sleep((0.25, 0.5))
             return True
-
+        if self.appear_then_click(EXP_INFO_C):
+            self.device.sleep((0.25, 0.5))
+            return True
+        if self.appear_then_click(EXP_INFO_D):
+            self.device.sleep((0.25, 0.5))
+            if self.appear(OPTS_INFO_D, interval=1):
+                logger.warning('OPTS_INFO_D popup appeared')
+                self.device.click(OPTS_INFO_D)
+                if self.appear_then_click(EXP_INFO_D):
+                    self.device.sleep((0.25, 0.5))
+                    return True
+                return False
+            return False
         return False
+#post process to do: reduce mood, decide to continue with another fleet or retreat, count as task failure
+# -abandon task(retreat, set config to false etc), stop alas
+# -abandon task, keep going with other tasks
+# -try task one more time, if fail again remove task
+# -let user decide with a new GUI option
 
     def handle_get_ship(self, drop=None):
         """
