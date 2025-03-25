@@ -530,7 +530,7 @@ class Combat(Level, HPBalancer, Retirement, SubmarineCall, CombatAuto, CombatMan
                 continue
             if self.handle_mission_popup_ack():
                 continue
-            if self.handle_auto_search_exit(drop=drop):
+            if self.handle_auto_search_exit():
                 continue
             if self.handle_combat_mis_click():
                 continue

@@ -120,7 +120,7 @@ class EnemySearchingHandler(InfoHandler):
             # although here expects an enemy searching animation.
             if self.handle_in_stage():
                 return True
-            if self.handle_auto_search_exit(drop=drop):
+            if self.handle_auto_search_exit():
                 continue
 
             # Popups
@@ -181,7 +181,7 @@ class EnemySearchingHandler(InfoHandler):
             # although here expects an enemy searching animation.
             if self.handle_in_stage():
                 return True
-            if self.handle_auto_search_exit(drop=drop):
+            if self.handle_auto_search_exit():
                 continue
 
             # Popups
