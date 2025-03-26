@@ -2,15 +2,11 @@ import numpy as np
 
 from module.base.button import ButtonGrid
 from module.base.decorator import Config
-from module.campaign.campaign_status import CampaignStatus
 from module.statistics.azurstats import *
-from module.statistics.campaign_bonus import CampaignBonusStatistics
 from module.handler.assets import *
 from module.handler.enemy_searching import EnemySearchingHandler
 from module.logger import logger
 from module.map.assets import FLEET_PREPARATION_CHECK
-
-campaign_bonus = CampaignBonusStatistics()
 
 AUTO_SEARCH_SETTINGS = [
     AUTO_SEARCH_SET_MOB,
@@ -216,40 +212,22 @@ class AutoSearchHandler(EnemySearchingHandler):
         Returns:
             bool: True if in auto-search menu, False otherwise.
         """
+        #allows map drop bonus screenshots for auto search +no duplicates of those
         with self.stat.new(
                 genre=self.config.campaign_name, method=self.config.DropRecord_CombatRecord
         ) as drop:
-            # Flag to track whether a screenshot has been taken
             if not hasattr(self, '_screenshot_taken'):
                 self._screenshot_taken = False
 
             if AUTO_SEARCH_MENU_CONTINUE.match_luma(self.device.image, offset=self._auto_search_menu_offset):
                 logger.info('Auto-search menu detected')
-
-                # Take a screenshot only if one hasn't been taken yet
                 if not self._screenshot_taken:
                     logger.info('Handling drops')
                     drop.handle_add(main=self, before=4)
-                    self._screenshot_taken = True  # Mark screenshot as taken
-
-                    if drop.count > 0:
-                        logger.info(f'Committing {drop.count} images')
-                        try:
-                            self.stat.commit(images=drop.images, genre=drop.genre, save=drop.save, upload=drop.upload)
-                        except Exception as e:
-                            logger.error(f'Failed to commit images: {e}')
-                        drop.clear()
-
-                # Exit the auto-search menu
-                logger.info('Exiting auto-search menu')
-                if self.handle_auto_search_exit():
-                    self._screenshot_taken = False  # Reset flag after exiting
-                    return False
-                else:
-                    logger.warning('Failed to exit auto-search menu')
-                    return True
+                    self._screenshot_taken = True
+                return True
             else:
-                self._screenshot_taken = False  # Reset flag if not in auto-search menu
+                self._screenshot_taken = False
                 return False
             
     def handle_auto_search_continue(self):
