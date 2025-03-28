@@ -78,6 +78,10 @@
       "name": "Raid",
       "help": ""
     },
+    "Hospital": {
+      "name": "Valley Hospital",
+      "help": ""
+    },
     "Coalition": {
       "name": "Little Academy",
       "help": ""
@@ -252,6 +256,10 @@
     },
     "OpsiDaemon": {
       "name": "OpSi Semi-auto",
+      "help": ""
+    },
+    "EventStory": {
+      "name": "Event Story",
       "help": ""
     },
     "Benchmark": {
@@ -721,7 +729,7 @@
       "event_20220915_cn": "Violet Tempest Blooming Lycoris Rerun",
       "event_20221124_cn": "The Alchemist and the Archipelago of Secrets",
       "event_20221222_cn": "Parallel Superimposition Rerun",
-      "event_20230223_cn": "Revelations of Dust",
+      "event_20230223_cn": "Revelations of Dust Rerun",
       "event_20230525_cn": "Confluence of Nothingness",
       "event_20230803_cn": "Anthem of Remembrance",
       "event_20230817_cn": "The Fools Scales",
@@ -785,6 +793,7 @@
       "war_archives_20211229_cn": "archives Tower of Transcendence",
       "war_archives_20220210_cn": "archives Northern Overture",
       "war_archives_20220224_cn": "archives Abyssal Refrain",
+      "war_archives_20220324_cn": "archives Virtual Tower",
       "war_archives_20220414_cn": "archives Aurora Noctis"
     },
     "Mode": {
@@ -1262,6 +1271,16 @@
     "StageFilter": {
       "name": "Raid Daily Stage Filter",
       "help": "Generally does not need to be modified or re-arranged but can do so if desired\nCan save on oil consumption if less are attacked\nSupports EX difficulty if specified, submarine is force called to increase clearing rate"
+    }
+  },
+  "Hospital": {
+    "_info": {
+      "name": "Event Settings",
+      "help": ""
+    },
+    "UseRecommendFleet": {
+      "name": "Use Fleet Recommendation",
+      "help": "If turned off, you need to manually prepare fleets of all 15 stages in advance"
     }
   },
   "MaritimeEscort": {
@@ -2488,6 +2507,18 @@
     "SelectEnemy": {
       "name": "Clear nearby enemies and resources",
       "help": "Clean nearby enemies and resources, and find new enemies or materials after cleaning, which usually clears the entire map. If some of them haven't been cleared, you need to solve them manually"
+    }
+  },
+  "EventStory": {
+    "_info": {
+      "name": "Event Story",
+      "help": "Complete the event story, only applicable to events aired on or after 20241219, please wait for about 3 minutes"
+    },
+    "SkipBattle": {
+      "name": "Kill game to skip battles",
+      "help": "",
+      "True": "Enabled",
+      "False": "False"
     }
   },
   "Benchmark": {

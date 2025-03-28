@@ -174,6 +174,9 @@ class GeneratedConfig:
     # Group `RaidDaily`
     RaidDaily_StageFilter = 'hard > normal > easy'
 
+    # Group `Hospital`
+    Hospital_UseRecommendFleet = True
+
     # Group `MaritimeEscort`
     MaritimeEscort_Enable = True
 
@@ -432,6 +435,9 @@ class GeneratedConfig:
     # Group `OpsiDaemon`
     OpsiDaemon_RepairShip = True
     OpsiDaemon_SelectEnemy = True
+
+    # Group `EventStory`
+    EventStory_SkipBattle = False  # True, False
 
     # Group `Benchmark`
     Benchmark_DeviceType = 'emulator'  # emulator, plone_cloud_with_adb, phone_cloud_without_adb, android_phone, android_phone_vmos

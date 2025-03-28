@@ -95,6 +95,11 @@ Event:
       - Campaign
       - StopCondition
       - Emotion
+    Hospital:
+      - Scheduler
+      - Hospital
+      - StopCondition
+      - Emotion
     Coalition:
       - Scheduler
       - Campaign
@@ -327,6 +332,8 @@ Tool:
       - Daemon
     OpsiDaemon:
       - OpsiDaemon
+    EventStory:
+      - EventStory
     Benchmark:
       - Benchmark
     AzurLaneUncensored:
