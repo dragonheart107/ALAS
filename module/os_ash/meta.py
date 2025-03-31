@@ -161,6 +161,7 @@ class OpsiAshBeacon(Meta):
     def _handle_ash_beacon_reward(self, skip_first_screenshot=True):
         """
         Reward meta.
+        + better meta category
 
         Pages:
             in: in_meta, BEACON_REWARD
@@ -185,6 +186,9 @@ class OpsiAshBeacon(Meta):
                 continue
             if self.appear(META_ENTRANCE, offset=(20, 300), interval=2):
                 continue
+        #category fix
+        if self._meta_category and self._meta_category not in self._meta_receive:
+            self._meta_receive.append(self._meta_category)
 
     def _satisfy_attack_condition(self):
         """
@@ -248,6 +252,7 @@ class OpsiAshBeacon(Meta):
             ['cn', 'en']: auto attack if needed
             others: do nothing this version
         """
+        self._meta_category = None
         # Page beacon or dossier
         if self.appear(BEACON_LIST, offset=(20, 20)):
             self._meta_category = "beacon"
@@ -486,7 +491,8 @@ class OpsiAshBeacon(Meta):
 
         with self.config.multi_set():
             for meta in self._meta_receive:
-                MetaReward(self.config, self.device).run(category=meta)
+                if meta in ("beacon", "dossier"):
+                    MetaReward(self.config, self.device).run(category=meta)
             self._meta_receive = []
             self.config.task_delay(server_update=True)
 
