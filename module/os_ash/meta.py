@@ -92,7 +92,9 @@ class OpsiAshBeacon(Meta):
     def _attack_meta(self, skip_first_screenshot=True):
         """
         Handle all META attack events.
-        Modified to log _meta_receive state when updating.
+        Pages:
+            in: in_meta
+            out: in_meta
         """
         while 1:
             if skip_first_screenshot:
@@ -110,6 +112,7 @@ class OpsiAshBeacon(Meta):
                 if self._begin_meta():
                     continue
                 else:
+                    # Normal finish
                     break
             if MetaState.ATTACKING == state:
                 if not self._pre_attack():
@@ -119,9 +122,10 @@ class OpsiAshBeacon(Meta):
                     continue
             if MetaState.COMPLETE == state:
                 self._handle_ash_beacon_reward()
-                if self._meta_category and self._meta_category not in self._meta_receive:  # Explicit None check
+                if self._meta_category is not None and self._meta_category not in self._meta_receive:
                     self._meta_receive.append(self._meta_category)
-                    logger.info(f'Updated meta_receive list: {self._meta_receive}')  # New logging
+                    logger.info(f'Added to meta_receive: {self._meta_category}. Current list: {self._meta_receive}')
+                # Check other tasks after kill a meta
                 self.config.check_task_switch()
                 continue
 
@@ -244,13 +248,23 @@ class OpsiAshBeacon(Meta):
             ['cn', 'en']: auto attack if needed
             others: do nothing this version
         """
+        # Page beacon or dossier
         if self.appear(BEACON_LIST, offset=(20, 20)):
             self._meta_category = "beacon"
-        elif self.appear(DOSSIER_LIST, offset=(20, 20)):
+            logger.info(f'Set meta category: beacon')
+            if self.config.OpsiAshBeacon_OneHitMode or self.config.OpsiAshBeacon_RequestAssist:
+                if not self._ask_for_help():
+                    return False
+            return True
+        if self.appear(DOSSIER_LIST, offset=(20, 20)):
             self._meta_category = "dossier"
-        
-        logger.info(f'Setting meta category: {self._meta_category}')  # New logging
-        return True
+            logger.info(f'Set meta category: dossier')
+            # can auto attack but not auto attacking
+            if _server_support_dossier_auto_attack() and self.config.OpsiAshBeacon_DossierAutoAttackMode \
+                    and self.appear(META_AUTO_ATTACK_START, offset=(5, 5)):
+                return self._dossier_auto_attack()
+            return True
+        return False
 
     def _ask_for_help(self):
         """
@@ -468,21 +482,22 @@ class OpsiAshBeacon(Meta):
         self._ensure_meta_page()
         self._attack_meta()
 
+
     def run(self):
         """
-        Modified to log final _meta_receive state before processing rewards.
+        Modified to include logging of reward processing.
         """
         self.ui_ensure(page_reward)
         self._begin_beacon()
 
         with self.config.multi_set():
-            logger.info(f'Processing rewards for meta categories: {self._meta_receive}')  # New logging
+            logger.info(f'Starting reward processing for categories: {self._meta_receive}')
             for meta in self._meta_receive:
+                logger.info(f'Processing rewards for: {meta}')
                 MetaReward(self.config, self.device).run(category=meta)
             self._meta_receive = []
-            logger.info('Cleared meta_receive list')  # New logging
+            logger.info('Cleared meta_receive list')
             self.config.task_delay(server_update=True)
-
 
 class AshBeaconAssist(Meta):
     def _attack_meta(self, skip_first_screenshot=True):
