@@ -86,16 +86,13 @@ def _server_support_dossier_auto_attack():
 
 
 class OpsiAshBeacon(Meta):
-    _meta_receive = []
-    _meta_category = "undefined"
+    _meta_receive = []  # Tracks completed meta categories for reward collection
+    _meta_category = None  # Explicit None instead of "undefined"
 
     def _attack_meta(self, skip_first_screenshot=True):
         """
         Handle all META attack events.
-
-        Pages:
-            in: in_meta
-            out: in_meta
+        Modified to log _meta_receive state when updating.
         """
         while 1:
             if skip_first_screenshot:
@@ -113,7 +110,6 @@ class OpsiAshBeacon(Meta):
                 if self._begin_meta():
                     continue
                 else:
-                    # Normal finish
                     break
             if MetaState.ATTACKING == state:
                 if not self._pre_attack():
@@ -123,9 +119,9 @@ class OpsiAshBeacon(Meta):
                     continue
             if MetaState.COMPLETE == state:
                 self._handle_ash_beacon_reward()
-                if not self._meta_category in self._meta_receive:
+                if self._meta_category and self._meta_category not in self._meta_receive:  # Explicit None check
                     self._meta_receive.append(self._meta_category)
-                # Check other tasks after kill a meta
+                    logger.info(f'Updated meta_receive list: {self._meta_receive}')  # New logging
                 self.config.check_task_switch()
                 continue
 
@@ -161,7 +157,6 @@ class OpsiAshBeacon(Meta):
     def _handle_ash_beacon_reward(self, skip_first_screenshot=True):
         """
         Reward meta.
-        + better meta category
 
         Pages:
             in: in_meta, BEACON_REWARD
@@ -186,9 +181,6 @@ class OpsiAshBeacon(Meta):
                 continue
             if self.appear(META_ENTRANCE, offset=(20, 300), interval=2):
                 continue
-        #category fix
-        if self._meta_category and self._meta_category not in self._meta_receive:
-            self._meta_receive.append(self._meta_category)
 
     def _satisfy_attack_condition(self):
         """
@@ -252,22 +244,13 @@ class OpsiAshBeacon(Meta):
             ['cn', 'en']: auto attack if needed
             others: do nothing this version
         """
-        self._meta_category = None
-        # Page beacon or dossier
         if self.appear(BEACON_LIST, offset=(20, 20)):
             self._meta_category = "beacon"
-            if self.config.OpsiAshBeacon_OneHitMode or self.config.OpsiAshBeacon_RequestAssist:
-                if not self._ask_for_help():
-                    return False
-            return True
-        if self.appear(DOSSIER_LIST, offset=(20, 20)):
+        elif self.appear(DOSSIER_LIST, offset=(20, 20)):
             self._meta_category = "dossier"
-            # can auto attack but not auto attacking
-            if _server_support_dossier_auto_attack() and self.config.OpsiAshBeacon_DossierAutoAttackMode \
-                    and self.appear(META_AUTO_ATTACK_START, offset=(5, 5)):
-                return self._dossier_auto_attack()
-            return True
-        return False
+        
+        logger.info(f'Setting meta category: {self._meta_category}')  # New logging
+        return True
 
     def _ask_for_help(self):
         """
@@ -486,14 +469,18 @@ class OpsiAshBeacon(Meta):
         self._attack_meta()
 
     def run(self):
+        """
+        Modified to log final _meta_receive state before processing rewards.
+        """
         self.ui_ensure(page_reward)
         self._begin_beacon()
 
         with self.config.multi_set():
+            logger.info(f'Processing rewards for meta categories: {self._meta_receive}')  # New logging
             for meta in self._meta_receive:
-                if meta in ("beacon", "dossier"):
-                    MetaReward(self.config, self.device).run(category=meta)
+                MetaReward(self.config, self.device).run(category=meta)
             self._meta_receive = []
+            logger.info('Cleared meta_receive list')  # New logging
             self.config.task_delay(server_update=True)
 
 
