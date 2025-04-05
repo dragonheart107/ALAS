@@ -5,7 +5,8 @@ from module.raid.assets import *
 from module.retire.assets import DOCK_CHECK
 from module.ui.assets import *
 from module.ui_white.assets import *
-
+from module.meta_reward.assets import DOSSIER_REWARD_CHECK, BEACON_REWARD_ENTER, DOSSIER_REWARD_ENTER
+from module.os_ash.assets import ASH_SHOWDOWN, META_MAIN_BEACON_ENTRANCE, META_MAIN_DOSSIER_ENTRANCE, META_ENTRANCE_WHITEUI, META_ENTRANCE
 
 class Page:
     # Key: str, page name like "page_main"
@@ -219,8 +220,24 @@ page_shipyard = Page(SHIPYARD_CHECK)
 page_shipyard.link(button=GOTO_MAIN, destination=page_main)
 
 # Meta
-page_meta = Page(META_CHECK)
-page_meta.link(button=GOTO_MAIN, destination=page_main)
+page_meta_menu = Page(ASH_SHOWDOWN)
+page_meta_beacon = Page(META_BEACON)
+page_meta_dossier = Page(META_DOSSIER)
+page_meta_dos_reward = Page(DOSSIER_REWARD_CHECK)
+page_meta_lab = Page(META_LAB)
+page_meta_menu.link(button=GOTO_MAIN, destination=page_main)
+page_meta_beacon.link(button=GOTO_MAIN, destination=page_main)
+page_meta_dossier.link(button=GOTO_MAIN, destination=page_main)
+page_meta_lab.link(button=GOTO_MAIN, destination=page_main)
+page_meta_lab.link(button=BACK_ARROW, destination=page_meta_menu)
+page_meta_menu.link(button=META_MAIN_BEACON_ENTRANCE, destination=page_meta_beacon)
+page_meta_menu.link(button=META_MAIN_DOSSIER_ENTRANCE, destination=page_meta_dossier)
+page_meta_beacon.link(button=BEACON_REWARD_ENTER, destination=page_meta_lab)
+page_meta_dossier.link(button=DOSSIER_REWARD_ENTER, destination=page_meta_dos_reward)
+page_reward.link(button=META_ENTRANCE_WHITEUI, destination=page_meta_menu)
+page_reward.link(button=META_ENTRANCE, destination=page_meta_menu)
+page_meta_beacon.link(button=BACK_ARROW, destination=page_meta_menu)
+page_meta_dossier.link(button=BACK_ARROW, destination=page_meta_menu)
 
 # Storage
 page_storage = Page(STORAGE_CHECK)
@@ -232,7 +249,7 @@ page_main_white.link(button=MAIN_GOTO_STORAGE_WHITE, destination=page_storage)
 page_reshmenu = Page(RESHMENU_CHECK)
 page_reshmenu.link(button=RESHMENU_GOTO_RESEARCH, destination=page_research)
 page_reshmenu.link(button=RESHMENU_GOTO_SHIPYARD, destination=page_shipyard)
-page_reshmenu.link(button=RESHMENU_GOTO_META, destination=page_meta)
+page_reshmenu.link(button=RESHMENU_GOTO_META, destination=page_meta_lab)
 page_reshmenu.link(button=GOTO_MAIN, destination=page_main)
 page_main.link(button=MAIN_GOTO_RESHMENU, destination=page_reshmenu)
 page_main_white.link(button=MAIN_GOTO_RESHMENU, destination=page_reshmenu)

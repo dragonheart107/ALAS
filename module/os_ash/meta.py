@@ -10,8 +10,8 @@ from module.ocr.ocr import Digit, DigitCounter
 from module.os_ash.ash import AshCombat
 from module.os_ash.assets import *
 from module.os_handler.map_event import MapEventHandler
-from module.ui.assets import BACK_ARROW
-from module.ui.page import page_reward
+from module.ui.assets import BACK_ARROW, META_LAB
+from module.ui.page import page_meta_menu, page_meta_beacon, page_meta_dossier, page_reward, page_meta_dos_reward
 from module.ui.ui import UI
 
 
@@ -20,6 +20,7 @@ class MetaState(Enum):
     ATTACKING = 'a meta under attack'
     COMPLETE = 'reward to be collected'
     UNDEFINED = 'a undefined page'
+    SYNCREWARD = 'synchronization reward page'
 
 
 OCR_BEACON_TIER = Digit(BEACON_TIER, name='OCR_ASH_TIER')
@@ -72,18 +73,21 @@ class Meta(UI, MapEventHandler):
             return True
         if self.handle_popup_cancel('META'):
             return True
-        if self.appear_then_click(META_ENTRANCE, offset=(20, 300), interval=2):
+        if self.appear_then_click(META_ENTRANCE_WHITEUI, offset=(20, 300), interval=2):
             return True
+        if self.appear_then_click(META_ENTRANCE, offset=(20, 300), interval=2):
+            return True        
         return False
 
 
 def _server_support():
     return server.server in ['cn', 'en', 'jp', 'tw']
 
-
 def _server_support_dossier_auto_attack():
     return server.server in ['cn', 'en']
 
+def _server_support_dossier_boss_select():
+    return server.server in ['en']
 
 class OpsiAshBeacon(Meta):
     # _meta_receive = []
@@ -109,6 +113,9 @@ class OpsiAshBeacon(Meta):
             logger.info('Meta state:' + state.name)
             if MetaState.UNDEFINED == state:
                 continue
+            if MetaState.SYNCREWARD == state:
+                self.ui_ensure(page_meta_beacon) or self.ui_ensure(page_meta_dossier)
+                continue
             if MetaState.INIT == state:
                 if self._begin_meta():
                     continue
@@ -122,7 +129,12 @@ class OpsiAshBeacon(Meta):
                     self._make_an_attack()
                     continue
             if MetaState.COMPLETE == state:
+                if self.appear(BEACON_LIST, offset=(20, 20)):
+                    self._meta_category = "beacon"
+                elif self.appear(DOSSIER_LIST, offset=(20, 20)):
+                    self._meta_category = "dossier"
                 self._handle_ash_beacon_reward()
+                logger.info('Category:' + self._meta_category)
                 MetaReward(self.config, self.device).run(category=self._meta_category)
                 # if not self._meta_category in self._meta_receive:
                 #     self._meta_receive.append(self._meta_category)
@@ -183,6 +195,8 @@ class OpsiAshBeacon(Meta):
                 continue
             # Accidentally goto main page
             if self.ui_main_appear_then_click(page_reward, interval=2):
+                continue
+            if self.appear(META_ENTRANCE_WHITEUI, offset=(20, 300), interval=2):
                 continue
             if self.appear(META_ENTRANCE, offset=(20, 300), interval=2):
                 continue
@@ -381,8 +395,11 @@ class OpsiAshBeacon(Meta):
                 if self.appear_then_click(META_MAIN_DOSSIER_ENTRANCE, offset=(20, 20), interval=2):
                     logger.info('Select dossier entrance into')
                     return True
-                else:
-                    logger.info('None dossier has been selected')
+                logger.info('Check dossier for new selectable')
+                dossier_result = DossierSelect(self.config, self.device).run()
+                if not dossier_result:
+                    logger.info('No dossier available')
+                return dossier_result
             return False
         # Page beacon
         elif self.appear(BEACON_LIST, offset=(20, 20), interval=2):
@@ -432,6 +449,8 @@ class OpsiAshBeacon(Meta):
             return MetaState.INIT
         elif self.appear(ASH_SHOWDOWN, offset=(30, 30)):
             return MetaState.INIT
+        elif self.appear(META_LAB, offset=(30, 30)):
+            return MetaState.SYNCREWARD
         return MetaState.UNDEFINED
 
     def _in_meta_page(self):
@@ -439,57 +458,58 @@ class OpsiAshBeacon(Meta):
                or self.appear(BEACON_LIST, offset=(20, 20)) \
                or self.appear(DOSSIER_LIST, offset=(20, 20))
 
-    def _ensure_meta_page(self, skip_first_screenshot=True):
-        logger.info('Ensure beacon attack page')
-        while 1:
-            if skip_first_screenshot:
-                skip_first_screenshot = False
-            else:
-                self.device.screenshot()
+    # def _ensure_meta_page(self, skip_first_screenshot=True):
+    #     self.ui_ensure(page_meta_beacon)
+    #     logger.info('Ensure beacon attack page')
+    #     while 1:
+    #         if skip_first_screenshot:
+    #             skip_first_screenshot = False
+    #         else:
+    #             self.device.screenshot()
 
-            if self._in_meta_page():
-                logger.info('In meta page')
-                return True
-            if self.handle_map_event():
-                continue
-            if self.appear_then_click(META_ENTRANCE, offset=(20, 300), interval=2):
-                continue
+    #         if self._in_meta_page():
+    #             logger.info('In meta page')
+    #             return True
+    #         if self.handle_map_event():
+    #             continue
+    #         if self.appear_then_click(META_ENTRANCE, offset=(20, 300), interval=2):
+    #             continue
 
-    def ensure_dossier_page(self, skip_first_screenshot=True):
-        self.ui_ensure(page_reward)
-        self._ensure_meta_page()
-        logger.info('Ensure dossier meta page')
-        while 1:
-            if skip_first_screenshot:
-                skip_first_screenshot = False
-            else:
-                self.device.screenshot()
+    # def ensure_dossier_page(self, skip_first_screenshot=True):
+    #     self.ui_ensure(page_meta_dossier)
+    #     #self._ensure_meta_page()
+    #     logger.info('Ensure dossier meta page')
+    #     while 1:
+    #         if skip_first_screenshot:
+    #             skip_first_screenshot = False
+    #         else:
+    #             self.device.screenshot()
 
-            if self.appear(DOSSIER_LIST, offset=(20, 20)):
-                logger.info('In dossier page')
-                return True
-            if self.handle_map_event():
-                continue
-            if self.appear(ASH_SHOWDOWN, offset=(30, 30)):
-                self.device.click(META_MAIN_DOSSIER_ENTRANCE)
-                continue
+    #         if self.appear(DOSSIER_LIST, offset=(20, 20)):
+    #             logger.info('In dossier page')
+    #             return True
+    #         if self.handle_map_event():
+    #             continue
+    #         if self.appear(ASH_SHOWDOWN, offset=(30, 30)):
+    #             self.device.click(META_MAIN_DOSSIER_ENTRANCE)
+    #             continue
 
     def _begin_beacon(self):
         logger.hr('Meta Beacon Attack')
         if not _server_support():
             logger.info("Server not support dossier beacon and OneHitMode, please contact the developer.")
-        self._ensure_meta_page()
+        #self._ensure_meta_page()
         self._attack_meta()
 
     def run(self):
-        self.ui_ensure(page_reward)
+        self.ui_ensure(page_meta_menu)
         self._begin_beacon()
 
-        with self.config.multi_set():
+        #with self.config.multi_set():
         #     for meta in self._meta_receive:
         #         MetaReward(self.config, self.device).run(category=meta)
         #     self._meta_receive = []
-            self.config.task_delay(server_update=True)
+        self.config.task_delay(server_update=True)
 
 
 class AshBeaconAssist(Meta):
@@ -596,7 +616,9 @@ class AshBeaconAssist(Meta):
                 return True
             if self.handle_map_event():
                 continue
-            if self.appear_then_click(META_ENTRANCE, offset=(20, 300), interval=2):
+            if self.appear_then_click(META_ENTRANCE_WHITEUI, offset=(20, 300), interval=2):
+                continue
+            if self.appear_then_click(META_ENTRANCE, offset=(20,300), interval=2):
                 continue
             if self.appear(ASH_SHOWDOWN, offset=(20, 20), interval=2):
                 self.device.click(META_MAIN_BEACON_ENTRANCE)
@@ -614,10 +636,49 @@ class AshBeaconAssist(Meta):
         return self._attack_meta(skip_first_screenshot=False)
 
     def run(self):
-        self.ui_ensure(page_reward)
+        self.ui_ensure(page_meta_menu)
 
         if self._begin_meta_assist():
             MetaReward(self.config, self.device).run()
             self.config.task_delay(server_update=True)
         else:
             self.config.task_delay(minute=(10, 20))
+
+class DossierSelect(Meta):
+    def _ensure_dossier_unlock_tab(self, skip_first_screenshot=True):
+        logger.info('Ensure dossier unlock tab')
+        while 1:
+            if skip_first_screenshot:
+                skip_first_screenshot = False
+            else:
+                self.device.screenshot()
+
+            if self.appear(DOSSIER_UNLOCK_TAB) or self.appear(DOSSIER_NOT_FIN_TAB):
+                logger.info('In dossier unlock tab')
+                return True
+            if self.appear(DOSSIER_FIN_TAB) or self.appear(DOSSIER_NOT_UNLOCK_TAB):
+                self.device.click(DOSSIER_UNLOCK_TAB)
+                logger.info('changed to correct dossier tab')
+                continue
+
+    def run(self,  skip_first_screenshot=True):
+        self.ui_ensure(page_meta_dos_reward)
+        if not _server_support_dossier_boss_select():
+            logger.info("Server not support new dossier boss select, please contact the developer.")
+        else:
+            self._ensure_dossier_unlock_tab()
+            while 1:
+                if skip_first_screenshot:
+                    skip_first_screenshot = False
+                else:
+                    self.device.screenshot()
+                if self.appear_then_click(DOSSIER_UNLOCKABLE):
+                    return True
+                if self.appear(DOSSIER_ACTIVE):
+                    return True
+                if self.appear_then_click(DOSSIER_SWITCH_CANCEL):
+                    return True
+                if self.appear(DOSSIER_EMPTYUNLOCK):
+                    return False
+                if self.appear(DOSSIER_EMPTYFIN):
+                    self.device.click(DOSSIER_UNLOCK_TAB)

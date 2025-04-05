@@ -3,7 +3,7 @@ from module.combat.combat import Combat
 from module.logger import logger
 from module.meta_reward.assets import *
 from module.os_ash.assets import DOSSIER_LIST
-from module.ui.page import page_meta
+from module.ui.page import page_meta_menu, page_meta_beacon, page_meta_dossier, page_meta_lab, page_meta_dos_reward, page_reward
 from module.ui.ui import UI
 
 
@@ -14,7 +14,7 @@ class BeaconReward(Combat, UI):
             bool: If appear.
 
         Page:
-            in: page_meta
+            in: page_meta_lab
         """
         if self.appear(META_REWARD_NOTICE, threshold=30):
             logger.info('Found meta reward red dot')
@@ -32,7 +32,7 @@ class BeaconReward(Combat, UI):
             bool: If received.
 
         Pages:
-            in: page_meta or REWARD_CHECK
+            in: page_meta_lab or REWARD_CHECK
             out: REWARD_CHECK
         """
         logger.hr('Meta reward receive', level=1)
@@ -80,7 +80,7 @@ class BeaconReward(Combat, UI):
             bool: If appear.
 
         Page:
-            in: page_meta
+            in: page_meta_lab
         """
         if self.appear(SYNC_REWARD_NOTICE, threshold=30, interval=interval):
             return True
@@ -147,7 +147,7 @@ class BeaconReward(Combat, UI):
             logger.info(f'MetaReward is not supported in {self.config.SERVER}, please contact server maintainers')
             return
 
-        self.ui_ensure(page_meta)
+        self.ui_ensure(page_meta_lab)
 
         if self.meta_sync_notice_appear():
             logger.info('Found meta sync red dot')
@@ -251,9 +251,9 @@ class DossierReward(Combat, UI):
         else:
             logger.info(f'MetaReward is not supported in {self.config.SERVER}, please contact server maintainers')
             return
-
-        from module.os_ash.meta import OpsiAshBeacon
-        OpsiAshBeacon(self.config, self.device).ensure_dossier_page()
+        self.ui_ensure(page_meta_dossier)
+        # from module.os_ash.meta import OpsiAshBeacon
+        # OpsiAshBeacon(self.config, self.device).ensure_dossier_page()
         if self.meta_reward_notice_appear():
             self.meta_reward_enter()
             self.meta_reward_receive()
