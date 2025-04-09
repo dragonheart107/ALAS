@@ -10,7 +10,7 @@ from module.ocr.ocr import Digit, DigitCounter
 from module.os_ash.ash import AshCombat
 from module.os_ash.assets import *
 from module.os_handler.map_event import MapEventHandler
-from module.ui.assets import BACK_ARROW, META_LAB
+from module.ui.assets import BACK_ARROW#, META_LAB
 from module.ui.page import page_meta_menu, page_meta_beacon, page_meta_dossier, page_reward, page_meta_dos_reward
 from module.ui.ui import UI
 
@@ -20,8 +20,8 @@ class MetaState(Enum):
     ATTACKING = 'a meta under attack'
     COMPLETE = 'reward to be collected'
     UNDEFINED = 'a undefined page'
-    SYNCREWARD = 'synchronization reward page'
-    BEACON_NOBOSS = 'exhausted beacon boss for the day'
+    #SYNCREWARD = 'synchronization reward page'
+    META_NOBOSS = 'exhausted boss for the day'
 
 
 OCR_BEACON_TIER = Digit(BEACON_TIER, name='OCR_ASH_TIER')
@@ -113,11 +113,11 @@ class OpsiAshBeacon(Meta):
             logger.info('Meta state:' + state.name)
             if MetaState.UNDEFINED == state:
                 continue
-            if MetaState.BEACON_NOBOSS == state:
+            if MetaState.META_NOBOSS == state:
                 break
-            if MetaState.SYNCREWARD == state:
-                self.ui_ensure(page_meta_beacon)
-                continue
+            # if MetaState.SYNCREWARD == state:
+            #     self.ui_ensure(page_meta_menu)
+            #     continue
             if MetaState.INIT == state:
                 if self._begin_meta():
                     continue
@@ -382,14 +382,13 @@ class OpsiAshBeacon(Meta):
         In beacon or dossier:
             begin a new meta if needed, or back to meta main page
         """
-        # Page meta main
-        if self.appear(ASH_SHOWDOWN, offset=(30, 30), interval=2):
-            # Beacon
+        if self.ui_page_appear(page_meta_menu):
+            #Beacon
             if self._check_beacon_point():
                 self.device.click(META_MAIN_BEACON_ENTRANCE)
                 logger.info('Select beacon entrance into')
                 return True
-            # Dossier
+            #Dossier
             if _server_support() \
                     and self.config.OpsiAshBeacon_AttackMode == 'current_dossier' \
                     and self._check_dossier_point():
@@ -400,17 +399,17 @@ class OpsiAshBeacon(Meta):
                 dossier_result = DossierSelect(self.config, self.device).run()
                 if not dossier_result:
                     logger.info('No dossier available')
-                return dossier_result
-            return False
+                    return dossier_result
+                return False    
         # Page beacon
-        elif self.appear(BEACON_LIST, offset=(20, 20), interval=2):
+        elif self.ui_page_appear(page_meta_beacon):
             if self._check_beacon_point():
                 self.device.click(META_BEGIN_ENTRANCE)
                 logger.info('Begin a beacon')
             return True
         # Page dossier
         elif _server_support() \
-                and self.appear(DOSSIER_LIST, offset=(20, 20), interval=2):
+                and self.ui_page_appear(page_meta_dossier):
             if self.config.OpsiAshBeacon_AttackMode == 'current_dossier' \
                     and self._check_dossier_point():
                 if self.appear_then_click(META_BEGIN_ENTRANCE, offset=(20, 20), interval=2):
@@ -441,26 +440,31 @@ class OpsiAshBeacon(Meta):
         if not self._in_meta_page():
             return MetaState.UNDEFINED
         # Page beacon or dossier
-        elif self.appear(BEACON_LIST, offset=(20, 20)) \
-                or self.appear(DOSSIER_LIST, offset=(20, 20)):
+        elif self.ui_page_appear(page_meta_beacon) \
+                or self.ui_page_appear(page_meta_dossier):
             if self.appear(HELP_ENTER, offset=(30, 30)):
                 return MetaState.ATTACKING
             elif self.appear(BEACON_REWARD, offset=(20, 20)):
                 return MetaState.COMPLETE
-            elif self.appear(META_BEACON_NOBOSS, offset=(20, 20)):
-                return MetaState.BEACON_NOBOSS
+            elif self.appear(BEACON_EMPTY, offset=(20, 20)) or self.appear(DOSSIER_EMPTY, offset=(20, 20)):
+                return MetaState.META_NOBOSS
             return MetaState.INIT
-        elif self.appear(ASH_SHOWDOWN, offset=(30, 30)):
+        elif self.ui_page_appear(page_meta_menu):
             return MetaState.INIT
-        elif self.appear(META_LAB, offset=(30, 30)):
-            return MetaState.SYNCREWARD
+        # elif self.appear(META_LAB, offset=(30, 30)):
+        #     return MetaState.SYNCREWARD
         return MetaState.UNDEFINED
 
     def _in_meta_page(self):
+        if (self.ui_page_appear(page_meta_menu) or 
+            self.ui_page_appear(page_meta_beacon) or 
+            self.ui_page_appear(page_meta_dossier)):
+            return True
+        # Fallback
         return self.appear(ASH_SHOWDOWN, offset=(30, 30)) \
                or self.appear(BEACON_LIST, offset=(20, 20)) \
                or self.appear(DOSSIER_LIST, offset=(20, 20)) \
-               or self.appear(META_LAB, offset=(20, 20))
+               #or self.appear(META_LAB, offset=(20, 20))
 
     def _ensure_meta_page(self, skip_first_screenshot=True):
         logger.info('Ensure beacon attack page')
@@ -649,4 +653,3 @@ class DossierSelect(Meta):
                 if self.appear(DOSSIER_EMPTYFIN):
                     self.device.click(DOSSIER_UNLOCK_TAB)
                     continue
-
