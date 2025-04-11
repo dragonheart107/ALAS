@@ -289,7 +289,7 @@ class MetaReward(BeaconReward, DossierReward):
         else:
             logger.info(f'Possible wrong parameter {category}, please contact the developers.')
 
-LAB_SCROLL = Scroll(LAB_SCROLL, name='LAB_SCROLL')
+#LAB_SCROLL = Scroll(LAB_SCROLL,color= name='LAB_SCROLL') color error, replace with simple swipe?
 
 SHIP_GRIDS_SELECT = ButtonGrid(
     origin=(8, 405), delta=(0, 75), button_shape=(226, 69), grid_shape=(1, 1), name='META_LAB_SHIPS') #select first landing page 1st
@@ -369,7 +369,7 @@ class MetaLabFilter(Button, UI):
         self.dock_filter.set(type=type, rarity=rarity, extra=extra)
         self.dock_filter_confirm(wait_loading=wait_loading)
 
-class MetaEnhance(UI, MetaLabFilter):
+class MetaEnhance(MetaLabFilter):
     def meta_enhance(self, skip_first_screenshot=True):
         while 1:
             if skip_first_screenshot:
