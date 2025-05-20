@@ -10,35 +10,7 @@ from module.equipment.assets import SHIP_INFO_EQUIPMENT_CHECK, SWIPE_AREA
 from module.ui.assets import BACK_ARROW
 from module.ui.page import page_dock, page_main
 
-#used awaken task as a sort of blueprint and modified accordingly
-
 class ConversionUnique(Dock):
-
-    # not sure if even needed, also unsure how having no conversion material looks like
-    #  def _get_button_state(self, button: Button):
-    #     """
-    #     Args:
-    #         button: COST_CONVT2
-
-    #     Returns:
-    #         bool: True if having sufficient resource, False if not
-    #     """
-    #     if button.match(self.device.image):
-    #         if self.image_color_count(area, color=(214, 53, 33), threshold=180, count=16):
-    #             return False
-    #         else:
-    #             return True
-
-    #maybe not a standalone def needed for this one
-    def handle_convt2_finish(self, skip_first_screenshot=True):
-        while 1:
-            if skip_first_screenshot:
-                skip_first_screenshot = False
-            else:
-                self.device.screenshot()
-
-        return self.appear_then_click(CONVT2_FINISH, offset=(20, 20), interval=1)
-    
     # checking if we are actually in gear page
     def is_in_gear(self):
         interval= Timer (3)
@@ -46,9 +18,8 @@ class ConversionUnique(Dock):
         return AUGMENT_INGEAR_CONFIRM.appear_on(self.device.image) and SHIP_INFO_EQUIPMENT_CHECK.appear_on(self.device.image)
 
     # closing augment popup
-    def augment_popup_close(self, skip_first_screenshot=True):
+    def augment_popup_close(self, skip_first_screenshot=False):
         logger.info('Augment popup close')
-        #self.interval_clear(AUGMENT_CANCEL)
         while 1:
             if skip_first_screenshot:
                 skip_first_screenshot = False
@@ -62,11 +33,8 @@ class ConversionUnique(Dock):
             if self.appear_then_click(AUGMENT_CANCEL2):
                 continue
 
-            # if self.handle_convt2_finish():
-            #     continue
-
     #get out of gear or dock to main page
-    def augment_exit(self, skip_first_screenshot=True):
+    def augment_exit(self, skip_first_screenshot=False):
         """
         Pages:
             in: is_in_gear or dock
@@ -82,12 +50,7 @@ class ConversionUnique(Dock):
 
             if self.ui_page_appear(page_dock):
                 logger.info(f'Gear exit at {page_dock}')
-                continue
-            # if self.appear_then_click(AUGMENT_CANCEL, interval=3, similarity=0.55):
-            # if self.augment_popup_close():
-            #     continue
-            # if self.handle_convt2_finish():
-            #     continue            
+                continue         
             if interval.reached() and self.is_in_gear():
                 logger.info(f'is_in_gear -> {BACK_ARROW}')
                 self.device.click(BACK_ARROW)
@@ -96,9 +59,18 @@ class ConversionUnique(Dock):
                 continue
             if self.is_in_main(interval=5):
                 break
+
+    def not_appear_then_click(self, button, checkbutton, offset=0, interval=3, similarity=0.85, threshold=30):
+        button = self.ensure_button(button)
+        checkbutton = self.ensure_button(checkbutton)
+        appear = self.appear(button, offset=offset, interval=interval, similarity=similarity, threshold=threshold)
+        checkappear = self.appear(checkbutton, offset=offset, interval=interval, similarity=similarity, threshold=threshold)
+        if not appear and checkappear:  # Execute click when appear is False and checkappear is True
+            self.device.click(button)
+        return
+
     #one cycle of augment enhancing
     def conv_uniq_enhance(self, skip_first_screenshot=False):
-        
         logger.hr('Enhance unique module', level=2)
         while not self.appear(AUGMENT_EMPTY):
 
@@ -106,64 +78,42 @@ class ConversionUnique(Dock):
                 skip_first_screenshot = False
             else:
                 self.device.screenshot()
-            self.not_appear_then_click(AUGMENT_EMPTY, AUGMENT_INGEAR_CONFIRM, interval=3)
-
-            if skip_first_screenshot:
-                 skip_first_screenshot = False
-            else:
-                 self.device.screenshot()
-
+            self.not_appear_then_click(AUGMENT_EMPTY, AUGMENT_INGEAR_CONFIRM)
             logger.hr('Unique module found', level=2)
-            if self.appear_then_click(CONVT2_SELECT, screenshot=False, interval=3):
-             logger.hr('Convertible module found', level=2)   
-             #self.appear_then_click(CONVT2_SELECT, interval=3)         
-             while 1:
+            self.wait_until_appear_then_click(CONVT2_SELECT)
+            # logger.hr('waiting for convert to appear')
+            # if self.appear(CONVT2_SELECT):
+            #     logger.hr('Convertible module found,entering conversion menu', level=2)
+            #     self.device.click(CONVT2_SELECT)
+            #     continue #doesn't actually enter; clicks too fast, wont get recognized by game
+            self.wait_until_appear(CONVT2_MENU)
+            while 1:
                 if skip_first_screenshot:
                     skip_first_screenshot = False 
                 else:
                     self.device.screenshot()
 
                 #augment already has max conversion
-                if self.appear(CONVT2_MAX, interval=3):
+                if self.appear(CONVT2_MAX):
                     logger.hr('Conversion at max')
-                    break
-                #in case of misclick into crafting menu, maybe not needed
-                # if self.appear(AUGMENT_CRAFT):
-                #     break
-
-                #when already enhanced but augment not yet max
-                if self.handle_convt2_finish():
-                    logger.hr('Conversion in progress')
-                    continue
+                    self.augment_popup_close()
+                    logger.info('finished conversion for this ship, closing conversion')
+                    return 
                 #actual conversion enhancing part
-                if self.appear(CONVT2_START, interval=3):
+                if self.appear(CONVT2_START):
                     logger.hr('Conversion start')
-                    self.appear_then_click(CONVT2_START_COST, interval=3)
-                 #interval.reset()
-                    self.appear_then_click(CONVT2_START, interval=3)
-                    self.appear_then_click(CONVT2_NEW, interval=3)
+                    self.appear_then_click(CONVT2_START_COST)
+                    self.appear_then_click(CONVT2_START)
+                    self.appear_then_click(CONVT2_NEW)
                     continue
-                self.augment_popup_close()
-                break
-            return
+                #when already enhanced but augment not yet max
+                if self.appear_then_click(CONVT2_FINISH):
+                    logger.hr('Conversion in progress, one cycle finished')
+                    continue
         else:
-            return 'no unique equipped'
-            
-    def not_appear_then_click(self, button, checkbutton, screenshot=False, genre='items', offset=0, interval=3, similarity=0.85, threshold=30):
-        button = self.ensure_button(button)
-        checkbutton = self.ensure_button(checkbutton)
-        appear = self.appear(button, offset=offset, interval=interval, similarity=similarity, threshold=threshold)
-        checkappear = self.appear(checkbutton, offset=offset, interval=interval, similarity=similarity, threshold=threshold)
-        if not appear and checkappear:  # Execute click when appear is False and checkappear is True
-            if screenshot:
-                self.device.sleep(self.config.WAIT_BEFORE_SAVING_SCREEN_SHOT)
-                self.device.screenshot()
-                self.device.save_screenshot(genre=genre)
-            self.device.click(button)
-        return
-    
-#modified version of the original inside module.equipment.equipment.py; didn't know how to exclude the retire specific if
-    def _ship_view_swipe(self, distance, check_button=AUGMENT_INGEAR_CONFIRM):
+            return
+                    
+    def _ship_view_swipe(self, distance, check_button=AUGMENT_INGEAR_CONFIRM, swipe_delay=3):
         swipe_count = 0
         swipe_timer = Timer(5, count=10)
         self.handle_info_bar()
@@ -182,7 +132,8 @@ class ConversionUnique(Dock):
                         skip_first_screenshot = False
                     else:
                         self.device.screenshot()
-                    if self.appear(check_button, offset=(30, 30)):
+                    # Use `interval=swipe_delay` to enforce a delay before next swipe
+                    if self.appear(check_button, offset=(30, 30), interval=swipe_delay):
                         break
                 swipe_count += 1
 
@@ -193,15 +144,12 @@ class ConversionUnique(Dock):
             if swipe_result:
                 if swipe_count > 1:
                     logger.info('Same ship on multiple swipes')
-                    return False, #swipe_result
+                    return False
                 continue
 
-            if self.appear(check_button, offset=(30, 30)) and not swipe_result:
+            if self.appear(check_button, offset=(30, 30), interval=swipe_delay) and not swipe_result:
                 logger.info('New ship detected on swipe')
-                return True, #swipe_result
-            
-        # def ship_view_next(self, check_button=AUGMENT_INGEAR_CONFIRM):
-        #  return self._ship_view_swipe(distance=-SWIPE_DISTANCE, check_button=check_button)
+                return True
 
     def conv_uniq_cycle(self, skip_first_screenshot=False):
         logger.hr('Augment conversion: Uniques', level = 3)
@@ -214,13 +162,12 @@ class ConversionUnique(Dock):
 
             if self.is_in_gear():
                 self.conv_uniq_enhance()
-                continue
-            if self._ship_view_swipe(-400) is True:
-                continue
-            if self._ship_view_swipe(-400) is False:
-                break
-
-
+                if self._ship_view_swipe(-400) is True:
+                    logger.info('new ship on swipe,restart cycle')
+                    continue
+                if self._ship_view_swipe(-400) is False:
+                    logger.info('same ship on multiple swipes, stopping')
+                    break
 
     def conv_uniq_run(self):
         """
@@ -242,67 +189,17 @@ class ConversionUnique(Dock):
 
         if self.appear(DOCK_EMPTY, offset=(20, 20)):
             logger.info('no ships with unique modules owned')
-            self.augment_exit()
-            return 'dock empty'
+            return
         
-        elif self.ship_info_enter(CARD_GRIDS[(0, 0)], check_button=SHIP_DETAIL_CHECK, long_click=False) or (self.ship_side_navbar_ensure(bottom=2)):
-            self.conv_uniq_cycle()
-            # while 1:
-            #     if self.conv_uniq_cycle():
-            #          continue
-            #     if self._ship_view_swipe(-400) is True:
-            #           continue
-            #     if self._ship_view_swipe(-400) is False:
-            #         #logger
-            #          return 'finish'
-# reevaluete gear assets, maybe include 'gear' 
-   
-        # elif self.appear_then_click(GEAR_ENTER_DEFAULT, offset = 0) or self.appear_then_click(GEAR_ENTER_RETRO, offset = 0) or self.appear_then_click(GEAR_ENTER_META_PRDR, offset = 0):
-        #     while 1:
-        #         if self.conv_uniq_cycle():
-        #              continue
-        #         if self._ship_view_swipe(200) is True:
-        #              continue
-        #         if self._ship_view_swipe(200) is False:
-        #             #logger
-        #              return 'finished'                
-            
-            # page_dock -> SHIP_DETAIL_CHECK
         else:
-            raise ScriptError(f'STH went wrong in conv uniq run')
-
-        
-            
-            # is_in_gear
-
- #           break
-#                if self._ship_view_swipe():
-
-#                 return False
-    
-
-        # page_dock empty
-
-#                result = 'finish'
-            # # 'insufficient', 'maxed value', 'timeout'
-            # if result in ('no module','max value'):
-            #     # Next module conversion, due to no unique equipped or due to current unique reaching maxed value
-            #     continue
-            # if result == 'insufficient':
-            #     logger.info('conv_uniq_run finished, resources exhausted')
-            #     break
-            # if result == 'timeout':
-            #     logger.info(f'conv_uniq_run finished, result={result}')
-            #     break
-#                    else:
-#         raise ScriptError(f'Unexpected conv_uniq result: {result}')
-
-#        else:
- #        raise ScriptError(f'Unexpected conv_uniq result: Neither empty dock nor clickable ship')
-
+            self.ship_info_enter(CARD_GRIDS[(0, 0)], check_button=SHIP_DETAIL_CHECK, long_click=False)
+            logger.info('dock was not empty, entered ship, attempt to go to gear tab of ship')
+            self.ship_side_navbar_ensure(bottom=2)
+            logger.info('entered gear tab, going to cycle')
+            self.conv_uniq_cycle()
 
     def run(self):
-        if self.config.SERVER not in ['cn', 'en']:
+        if self.config.SERVER not in ['en']:
             logger.error(f'Task "Augment" is not available on server {self.config.SERVER} yet, '
                          f'please contact server maintainers')
             self.config.task_stop()
@@ -319,3 +216,34 @@ class ConversionUnique(Dock):
 
         # Scheduler
         self.config.task_stop(message= 'Augment Task Conversion_unique has finished')
+
+# ================================================
+# Live Testing Section - Add to bottom of your file
+#python -m module.augment.conversion_unique
+# ================================================
+if __name__ == '__main__':
+    # Force English server
+    import module.config.server as server
+    server.server = 'en'
+
+    # Initialize with your actual config (not template)
+    az = ConversionUnique('alasdebug', task='Augment') 
+
+    # Force enable the augment conversion
+    az.config.Augment_ConversionUnique = True  # Directly modify the config
+
+
+    # # 1. First ensure you're at the main screen
+    # az.device.screenshot()
+    # if not az.is_in_main():
+    #     logger.warning("Please manually navigate to game main screen")
+    #     exit()
+    
+    # 2. Run the complete workflow
+    try:
+        logger.info("Starting full live test...")
+        az.run()  # This will execute the complete cycle
+        logger.info("Full test completed successfully")
+    except Exception as e:
+        logger.error(f"Test failed: {e}")
+        raise
