@@ -179,59 +179,51 @@ class BeaconReward(Combat, UI):
                 logger.info('meta_wait_reward_page ends at reward red dot')
                 break
 
-    # def run(self):
-    #     if self.config.SERVER in ['cn', 'en', 'jp']:
-    #         pass
-    #     else:
-    #         logger.info(f'MetaReward is not supported in {self.config.SERVER}, please contact server maintainers')
-    #         return
+    def run(self):
+        if self.config.SERVER in ['cn', 'en', 'jp']:
+            pass
+        else:
+            logger.info(f'MetaReward is not supported in {self.config.SERVER}, please contact server maintainers')
+            return
 
-    #     self.ui_ensure(page_meta)
-    #     self.meta_wait_reward_page()
+        self.ui_ensure(page_meta_lab)
+        self.meta_wait_reward_page()
 
-    #     # Sync rewards
-    #     # "sync" is the period that you gather meta points to 100% and get a meta ship
-    #     if self.meta_sync_notice_appear():
-    #         logger.info('Found meta sync red dot')
-    #         self.meta_sync_receive()
-    #     else:
-    #         logger.info('No meta sync red dot')
+        # Sync rewards
+        # "sync" is the period that you gather meta points to 100% and get a meta ship
+        if self.meta_sync_notice_appear():
+            logger.info('Found meta sync red dot')
+            self.meta_sync_receive()
+        else:
+            logger.info('No meta sync red dot')
 
-    #     # Meta rewards
-    #     if self.meta_reward_notice_appear():
-    #         logger.info('Found meta reward red dot')
-    #         self.meta_reward_receive()
-    #     else:
-    #         logger.info('No meta reward red dot')
+        # Meta rewards
+        if self.meta_reward_notice_appear():
+            logger.info('Found meta reward red dot')
+            self.meta_reward_receive()
+        else:
+            logger.info('No meta reward red dot')
 
-    # def run(self):
-    #     if self.config.SERVER in ['cn', 'en', 'jp']:
-    #         pass
-    #     else:
-    #         logger.info(f'MetaReward is not supported in {self.config.SERVER}, please contact server maintainers')
-    #         return
+        if self.appear(REWARD_CHECK):
+            logger.info(f'proceed to click reward')
+            self.meta_reward_receive()
+            logger.info(f'met_reward_receive done')
+        else:
+            logger.info(f'couldnt find reward check, trying fallback')
+            self.device.click(BACK_ARROW)
+            logger.info(f'click 1 page back')
+            if self.appear(META_LAB_LIST):
+                logger.info(f'found meta lab list')
+                if self.meta_sync_notice_appear():
+                    logger.info('Found meta sync red dot')
+                    self.meta_sync_receive()
+                else:
+                    logger.info('No meta sync red dot')
 
-    #     self.ui_ensure(page_meta_lab)
-    #     if self.appear(REWARD_CHECK):
-    #         logger.info(f'proceed to click reward')
-    #         self.meta_reward_receive()
-    #         logger.info(f'met_reward_receive done')
-    #     else:
-    #         logger.info(f'couldnt find reward check, trying fallback')
-    #         self.device.click(BACK_ARROW)
-    #         logger.info(f'click 1 page back')
-    #         if self.appear(META_LAB_LIST):
-    #             logger.info(f'found meta lab list')
-    #             if self.meta_sync_notice_appear():
-    #                 logger.info('Found meta sync red dot')
-    #                 self.meta_sync_receive()
-    #             else:
-    #                 logger.info('No meta sync red dot')
-
-    #             if self.meta_reward_notice_appear():
-    #                 logger.info(f'found reward notice from lab list')
-    #                 self.meta_reward_receive()
-    #                 logger.info('tried meta reward receive again')
+                if self.meta_reward_notice_appear():
+                    logger.info(f'found reward notice from lab list')
+                    self.meta_reward_receive()
+                    logger.info('tried meta reward receive again')
 
 class DossierReward(Combat, UI):
     def meta_reward_notice_appear(self):
