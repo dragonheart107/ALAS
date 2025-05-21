@@ -203,7 +203,7 @@ class BeaconReward(Combat, UI):
             self.meta_reward_receive()
         else:
             logger.info('No meta reward red dot')
-
+        #TODO after doing meta lab ui split doublecheck if neeeded again
         if self.appear(REWARD_CHECK):
             logger.info(f'proceed to click reward')
             self.meta_reward_receive()
