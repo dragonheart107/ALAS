@@ -174,11 +174,14 @@ class GeneratedConfig:
     # Group `RaidDaily`
     RaidDaily_StageFilter = 'hard > normal > easy'
 
+    # Group `Hospital`
+    Hospital_UseRecommendFleet = True
+
     # Group `MaritimeEscort`
     MaritimeEscort_Enable = True
 
     # Group `Coalition`
-    Coalition_Mode = 'hard'  # easy, normal, hard, ex
+    Coalition_Mode = 'tc1'  # tc1, tc2, tc3, sp, ex
     Coalition_Fleet = 'single'  # single, multi
 
     # Group `Commission`
@@ -330,6 +333,11 @@ class GeneratedConfig:
 
     # Group `Minigame`
     Minigame_Collect = False
+
+    # Group `PrivateQuarters`
+    PrivateQuarters_BuyRoses = True
+    PrivateQuarters_TargetInteract = True
+    PrivateQuarters_TargetShip = 'anchorage'  # anchorage, noshiro, sirius
 
     # Group `Daily`
     Daily_UseDailySkip = True

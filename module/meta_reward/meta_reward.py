@@ -28,10 +28,8 @@ class BeaconReward(Combat, UI):
             in: page_meta_lab
         """
         if self.appear(META_REWARD_NOTICE, threshold=30):
-            logger.info('Found meta reward red dot')
             return True
         else:
-            logger.info('No meta reward red dot')
             return False
 
     def meta_reward_receive(self, skip_first_screenshot=True):
@@ -151,36 +149,89 @@ class BeaconReward(Combat, UI):
         logger.info(f'Meta sync receive finished, received={received}')
         return received
 
-    def run(self):
-        if self.config.SERVER in ['cn', 'en', 'jp']:
-            pass
-        else:
-            logger.info(f'MetaReward is not supported in {self.config.SERVER}, please contact server maintainers')
-            return
+    def meta_wait_reward_page(self, skip_first_screenshot=True):
+        """
+        Wait the circle loading animation
+        """
+        timeout = Timer(2, count=6).start()
+        while 1:
+            if skip_first_screenshot:
+                skip_first_screenshot = False
+            else:
+                self.device.screenshot()
 
-        self.ui_ensure(page_meta_lab)
-        if self.appear(REWARD_CHECK):
-            logger.info(f'proceed to click reward')
-            self.meta_reward_receive()
-            logger.info(f'met_reward_receive done')
-        else:
-            logger.info(f'couldnt find reward check, trying fallback')
-            self.device.click(BACK_ARROW)
-            logger.info(f'click 1 page back')
-            if self.appear(META_LAB_LIST):
-                logger.info(f'found meta lab list')
-                if self.meta_sync_notice_appear():
-                    logger.info('Found meta sync red dot')
-                    self.meta_sync_receive()
-                else:
-                    logger.info('No meta sync red dot')
+            if timeout.reached():
+                logger.warning(f'meta_wait_reward_page timeout')
+                break
+            if self.appear(REWARD_ENTER, offset=(20, 20)):
+                logger.info(f'meta_wait_reward_page ends at {REWARD_ENTER}')
+                break
+            if self.appear(SYNC_ENTER, offset=(20, 20)):
+                logger.info(f'meta_wait_reward_page ends at {SYNC_ENTER}')
+                break
+            if self.appear(SYNC_TAP, offset=(20, 20)):
+                logger.info(f'meta_wait_reward_page ends at {SYNC_TAP}')
+                break
+            if self.meta_sync_notice_appear():
+                logger.info('meta_wait_reward_page ends at sync red dot')
+                break
+            if self.meta_reward_notice_appear():
+                logger.info('meta_wait_reward_page ends at reward red dot')
+                break
 
-                if self.meta_reward_notice_appear():
-                    logger.info(f'found reward notice from lab list')
-                    self.meta_reward_receive()
-                    logger.info('tried meta reward receive again')
+    # def run(self):
+    #     if self.config.SERVER in ['cn', 'en', 'jp']:
+    #         pass
+    #     else:
+    #         logger.info(f'MetaReward is not supported in {self.config.SERVER}, please contact server maintainers')
+    #         return
 
+    #     self.ui_ensure(page_meta)
+    #     self.meta_wait_reward_page()
 
+    #     # Sync rewards
+    #     # "sync" is the period that you gather meta points to 100% and get a meta ship
+    #     if self.meta_sync_notice_appear():
+    #         logger.info('Found meta sync red dot')
+    #         self.meta_sync_receive()
+    #     else:
+    #         logger.info('No meta sync red dot')
+
+    #     # Meta rewards
+    #     if self.meta_reward_notice_appear():
+    #         logger.info('Found meta reward red dot')
+    #         self.meta_reward_receive()
+    #     else:
+    #         logger.info('No meta reward red dot')
+
+    # def run(self):
+    #     if self.config.SERVER in ['cn', 'en', 'jp']:
+    #         pass
+    #     else:
+    #         logger.info(f'MetaReward is not supported in {self.config.SERVER}, please contact server maintainers')
+    #         return
+
+    #     self.ui_ensure(page_meta_lab)
+    #     if self.appear(REWARD_CHECK):
+    #         logger.info(f'proceed to click reward')
+    #         self.meta_reward_receive()
+    #         logger.info(f'met_reward_receive done')
+    #     else:
+    #         logger.info(f'couldnt find reward check, trying fallback')
+    #         self.device.click(BACK_ARROW)
+    #         logger.info(f'click 1 page back')
+    #         if self.appear(META_LAB_LIST):
+    #             logger.info(f'found meta lab list')
+    #             if self.meta_sync_notice_appear():
+    #                 logger.info('Found meta sync red dot')
+    #                 self.meta_sync_receive()
+    #             else:
+    #                 logger.info('No meta sync red dot')
+
+    #             if self.meta_reward_notice_appear():
+    #                 logger.info(f'found reward notice from lab list')
+    #                 self.meta_reward_receive()
+    #                 logger.info('tried meta reward receive again')
 
 class DossierReward(Combat, UI):
     def meta_reward_notice_appear(self):

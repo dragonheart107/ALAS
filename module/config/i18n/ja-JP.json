@@ -78,8 +78,12 @@
       "name": "Raid",
       "help": ""
     },
+    "Hospital": {
+      "name": "病院探訪",
+      "help": ""
+    },
     "Coalition": {
-      "name": "リトル学園",
+      "name": "星霜海嵐",
       "help": ""
     },
     "MaritimeEscort": {
@@ -115,8 +119,8 @@
       "help": ""
     },
     "CoalitionSp": {
-      "name": "Task.CoalitionSp.name",
-      "help": "Task.CoalitionSp.help"
+      "name": "星霜海嵐SP",
+      "help": ""
     },
     "Commission": {
       "name": "委託",
@@ -148,7 +152,7 @@
     },
     "Awaken": {
       "name": "Task.Awaken.name",
-      "help": "Task.Awaken.help"
+      "help": ""
     },
     "Daily": {
       "name": "デイリー",
@@ -184,7 +188,11 @@
     },
     "Minigame": {
       "name": "Task.Minigame.name",
-      "help": "Task.Minigame.help"
+      "help": ""
+    },
+    "PrivateQuarters": {
+      "name": "Task.PrivateQuarters.name",
+      "help": "Task.PrivateQuarters.help"
     },
     "OpsiGeneral": {
       "name": "一般設定",
@@ -725,7 +733,7 @@
       "event_20220915_cn": "赫の涙月 菫の暁風（復刻）",
       "event_20221124_cn": "錬金術士と謎の遺跡群島",
       "event_20221222_cn": "積重なる事象の幻界（復刻）",
-      "event_20230223_cn": "黙示の遺構",
+      "event_20230223_cn": "黙示の遺構（復刻）",
       "event_20230525_cn": "覆天せし万象の塵",
       "event_20230803_cn": "燃ゆる聖都の回想曲",
       "event_20230817_cn": "愚者の天秤",
@@ -744,6 +752,7 @@
       "event_20241121_cn": "危険発明接近中",
       "event_20241219_cn": "星降る夕影の残光",
       "event_20250227_cn": "籠檻に囚われし神光",
+      "event_20250424_cn": "チュリッパの海へ",
       "raid_20200624": "特別演習超空強襲波（復刻）",
       "raid_20210708": "交錯する新たな波 (復刻)",
       "raid_20220127": "秘密事件調査",
@@ -789,7 +798,9 @@
       "war_archives_20211229_cn": "檔案 遡望せし虹彩の塔",
       "war_archives_20220210_cn": "檔案 凍絶の北海",
       "war_archives_20220224_cn": "檔案 鳴動せし星霜の淵",
-      "war_archives_20220414_cn": "檔案 極夜照らす幻光"
+      "war_archives_20220324_cn": "檔案 幻像の塔",
+      "war_archives_20220414_cn": "檔案 極夜照らす幻光",
+      "war_archives_20220526_cn": "檔案 诚閃の剣 搖光の城"
     },
     "Mode": {
       "name": "Campaign.Mode.name",
@@ -1268,6 +1279,16 @@
       "help": "RaidDaily.StageFilter.help"
     }
   },
+  "Hospital": {
+    "_info": {
+      "name": "Hospital._info.name",
+      "help": "Hospital._info.help"
+    },
+    "UseRecommendFleet": {
+      "name": "Hospital.UseRecommendFleet.name",
+      "help": "Hospital.UseRecommendFleet.help"
+    }
+  },
   "MaritimeEscort": {
     "_info": {
       "name": "MaritimeEscort._info.name",
@@ -1286,9 +1307,10 @@
     "Mode": {
       "name": "Coalition.Mode.name",
       "help": "Coalition.Mode.help",
-      "easy": "easy",
-      "normal": "normal",
-      "hard": "hard",
+      "tc1": "tc1",
+      "tc2": "tc2",
+      "tc3": "tc3",
+      "sp": "sp",
       "ex": "ex"
     },
     "Fleet": {
@@ -2015,6 +2037,27 @@
     "Collect": {
       "name": "Minigame.Collect.name",
       "help": "Minigame.Collect.help"
+    }
+  },
+  "PrivateQuarters": {
+    "_info": {
+      "name": "PrivateQuarters._info.name",
+      "help": "PrivateQuarters._info.help"
+    },
+    "BuyRoses": {
+      "name": "PrivateQuarters.BuyRoses.name",
+      "help": "PrivateQuarters.BuyRoses.help"
+    },
+    "TargetInteract": {
+      "name": "PrivateQuarters.TargetInteract.name",
+      "help": "PrivateQuarters.TargetInteract.help"
+    },
+    "TargetShip": {
+      "name": "PrivateQuarters.TargetShip.name",
+      "help": "PrivateQuarters.TargetShip.help",
+      "anchorage": "anchorage",
+      "noshiro": "noshiro",
+      "sirius": "sirius"
     }
   },
   "Daily": {
