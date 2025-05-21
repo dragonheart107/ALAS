@@ -18,7 +18,7 @@ from module.ocr.ocr import Ocr
 from module.os_handler.assets import (AUTO_SEARCH_REWARD, EXCHANGE_CHECK, RESET_FLEET_PREPARATION, RESET_TICKET_POPUP)
 from module.raid.assets import *
 from module.ui.assets import *
-from module.ui.page import (Page, page_campaign, page_event, page_main, page_main_white, page_sp)
+from module.ui.page import (Page, page_campaign, page_event, page_main, page_main_white, page_sp, page_meta_lab, page_meta_lab_list, page_meta_lab_details)
 from module.ui_white.assets import *
 
 
@@ -39,7 +39,25 @@ class UI(InfoHandler):
                 return True
             return False
         return self.appear(page.check_button, offset=offset, interval=interval)
-
+    
+    def metalab_ui_page_appear(self, page, offset=(30, 30), interval=0):
+        """
+        Args:
+            page (Page):
+            offset:
+            interval:
+        """
+        if page == page_meta_lab:
+            if self.appear(page_meta_lab_list.check_button):
+                return page_meta_lab_list
+            if self.appear(page_meta_lab_details.check_button):
+                return page_meta_lab_details
+            return False
+        return self.appear(page.check_button, offset=offset, interval=interval)
+            
+    def get_metalab_page(self, offset=(30, 30), interval=0):
+        return self.metalab_ui_page_appear(page_main, offset=offset, interval=interval)
+    
     def is_in_main(self, offset=(30, 30), interval=0):
         return self.ui_page_appear(page_main, offset=offset, interval=interval)
 
@@ -409,10 +427,10 @@ class UI(InfoHandler):
             logger.info(f'UI additional: {SHIPYARD_CHECK} -> {GOTO_MAIN}')
             if self.appear_then_click(GOTO_MAIN, offset=(30, 30)):
                 return True
-        if self.appear(META_LAB, offset=(30, 30), interval=5):
-            logger.info(f'UI additional: {META_LAB} -> {GOTO_MAIN}')
-            if self.appear_then_click(GOTO_MAIN, offset=(30, 30)):
-                return True
+        # if self.appear(META_LAB, offset=(30, 30), interval=5):
+        #     logger.info(f'UI additional: {META_LAB} -> {GOTO_MAIN}')
+        #     if self.appear_then_click(GOTO_MAIN, offset=(30, 30)):
+        #         return True
         # Mistaken click
         if self.appear(PLAYER_CHECK, offset=(30, 30), interval=3):
             logger.info(f'UI additional: {PLAYER_CHECK} -> {GOTO_MAIN}')
