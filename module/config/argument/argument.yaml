@@ -302,12 +302,14 @@ Raid:
 RaidDaily:
   StageFilter: |-
     hard > normal > easy
+Hospital:
+  UseRecommendFleet: true
 MaritimeEscort:
   Enable: true
 Coalition:
   Mode:
-    value: hard
-    option: [ easy, normal, hard, ex ]
+    value: tc1
+    option: [ tc1, tc2, tc3, sp, ex ]
   Fleet:
     value: single
     option: [ single, multi ]
@@ -578,6 +580,12 @@ SupplyPack:
     option: [ 0, 1, 2, 3, 4, 5, 6 ]
 Minigame:
   Collect: false
+PrivateQuarters:
+    BuyRoses: true
+    TargetInteract: true
+    TargetShip:
+      value: anchorage
+      option: [ anchorage, noshiro, sirius ]
 # ==================== Daily ====================
 
 Daily:

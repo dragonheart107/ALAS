@@ -26,6 +26,7 @@
       "Event",
       "Event2",
       "Raid",
+      "Hospital",
       "Coalition",
       "MaritimeEscort",
       "WarArchives"
@@ -70,7 +71,8 @@
       "Shipyard",
       "Gacha",
       "Freebies",
-      "Minigame"
+      "Minigame",
+      "PrivateQuarters"
     ]
   },
   "Opsi": {

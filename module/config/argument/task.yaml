@@ -95,6 +95,11 @@ Event:
       - Campaign
       - StopCondition
       - Emotion
+    Hospital:
+      - Scheduler
+      - Hospital
+      - StopCondition
+      - Emotion
     Coalition:
       - Scheduler
       - Campaign
@@ -258,6 +263,9 @@ DailyMission:
       - SupplyPack
     Minigame:
       - Scheduler
+    PrivateQuarters:
+      - Scheduler
+      - PrivateQuarters
 
 # ==================== Opsi ====================
 
