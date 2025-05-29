@@ -51,11 +51,11 @@ class ConversionUnique(Dock):
 
             if self.ui_page_appear(page_dock):
                 logger.info(f'Gear exit at {page_dock}')
+                self.ui_goto_main()
                 continue         
             if interval.reached() and self.is_in_gear():
-                logger.info(f'is_in_gear -> {BACK_ARROW}')
-                self.device.click(BACK_ARROW)
-                self.device.click(BACK_ARROW)
+                logger.info(f'is_in_gear -> Main')
+                self.ui_goto_main()
                 interval.reset()
                 continue
             if self.is_in_main(interval=5):
@@ -66,10 +66,25 @@ class ConversionUnique(Dock):
         appear = self.appear(button, offset=offset, interval=interval, similarity=similarity, threshold=threshold)
         checkbutton = Ocr(checkbutton, lang='cnocr')
         checkappear = checkbutton.ocr(self.device.image)
-        #rework, image matching did not detect checkbutton due to random backgrounds, was inconsistent
-        #checkbutton = self.ensure_button(checkbutton)
-        #checkappear = self.appear(checkbutton, offset=offset, interval=interval, similarity=similarity, threshold=threshold)
-        if not appear and checkappear:  #click when its a augment module slot that is not empty
+        checkresult = checkappear.replace(' ','')
+        if self.config.SERVER == 'cn':
+            if checkresult == 'placeholder':
+                return True
+        
+        elif self.config.SERVER == 'jp':
+            if checkresult == 'placeholder':
+                return True
+            
+        elif self.config.SERVER == 'en':
+            if checkresult == 'A ugment':
+                return True
+            
+        elif self.config.SERVER == 'tw':
+            if checkresult == 'placeholder':
+                return True
+        #used OCR since using match or appear resulted in inconsistent behaviour due to random colours in background
+
+        if not appear and checkresult:  #click when its a augment module slot that is not empty
             self.device.click(button)
         return
 
@@ -87,19 +102,21 @@ class ConversionUnique(Dock):
                 logger.info('No unique module to enhance')
                 return
                 
-            if self.not_appear_then_click(AUGMENT_EMPTY, AUGMENT_INGEAR_CONFIRM, interval=3):
+            if self.not_appear_then_click(AUGMENT_EMPTY, AUGMENT_INGEAR_CONFIRM):
                 logger.info('clicking unique module')
                 continue
 
             if self.ui_page_appear(page_storage):
-                self.device.click(BACK_ARROW)
+                self.appear_then_click(BACK_ARROW)
+                self.device.click(AUGMENT_EMPTY)
                 continue
 
-            # if self.appear(MODULE_ENHANCE):
-            #     self.device.click(AUGMENT_CANCEL)
-            #     continue
+            if self.appear(MODULE_ENHANCE):
+                self.appear_then_click(AUGMENT_CANCEL)
+                self.device.click(AUGMENT_EMPTY)
+                continue
 
-            if self.appear(CONVT2_SELECT, interval=3):
+            if self.appear(CONVT2_SELECT):
                 logger.info('convert appeared, clicking')
                 self.device.click(CONVT2_SELECT)
                 continue
