@@ -157,6 +157,7 @@ class RewardGacha(GachaUI, GeneralShop, Retirement):
                 target_pool = 'light'
                 self.config.cross_set(keys=f'Gacha.Gacha.Amount', value= 1)
                 self.config.cross_set(keys=f'Gacha.Gacha.Pool', value= 'light')
+                self.config.load()
             else:
                 self.gacha_side_navbar_ensure(upper=2)
                 if self.appear(BUILD_WW_CHECK):
@@ -171,6 +172,8 @@ class RewardGacha(GachaUI, GeneralShop, Retirement):
                 target_pool = 'light'
                 self.config.cross_set(keys=f'Gacha.Gacha.Amount', value= 1)
                 self.config.cross_set(keys=f'Gacha.Gacha.Pool', value= 'light')
+                self.config.load()
+
             else:
                 self.gacha_bottom_navbar_ensure(left=1, is_build=True)
         elif target_pool in ['heavy', 'special']:
