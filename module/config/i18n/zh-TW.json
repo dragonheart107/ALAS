@@ -78,6 +78,10 @@
       "name": "共鬥活動",
       "help": ""
     },
+    "Hospital": {
+      "name": "深谷来信",
+      "help": ""
+    },
     "Coalition": {
       "name": "極地風暴",
       "help": ""
@@ -185,6 +189,10 @@
     "Minigame": {
       "name": "小遊戲",
       "help": "遊戲幣不會溢出時自動領取遊戲幣，有遊戲幣且獎勵沒滿時自動進行小遊戲"
+    },
+    "PrivateQuarters": {
+      "name": "宿舍計劃",
+      "help": ""
     },
     "OpsiGeneral": {
       "name": "通用設定",
@@ -321,6 +329,7 @@
       "com.YoStarJP.AzurLane": "日服",
       "com.hkmanjuu.azurlane.gp": "台服",
       "com.bilibili.blhx.huawei": "國服 com.bilibili.blhx.huawei",
+      "com.bilibili.blhx.honor": "國服 com.bilibili.blhx.honor",
       "com.bilibili.blhx.mi": "國服 com.bilibili.blhx.mi",
       "com.tencent.tmgp.bilibili.blhx": "國服 com.tencent.tmgp.bilibili.blhx",
       "com.bilibili.blhx.baidu": "國服 com.bilibili.blhx.baidu",
@@ -367,6 +376,8 @@
       "cn_android-23": "[国服] 长戟计划",
       "cn_android-24": "[国服] 暴雨行动",
       "cn_android-25": "[国服] 水仙行动",
+      "cn_android-26": "[国服] 冬月计划",
+      "cn_android-27": "[国服] 长弓计划",
       "cn_ios-0": "[国服] 夏威夷",
       "cn_ios-1": "[国服] 珊瑚海",
       "cn_ios-2": "[国服] 中途岛",
@@ -671,6 +682,7 @@
       "campaign_main": "主線圖",
       "coalition_20230323": "極地風暴",
       "coalition_20240627": "歡迎來到童心學院",
+      "coalition_20250626": "The Neon City Investigator",
       "event_20200227_cn": "Northern Overture",
       "event_20200312_cn": "斯圖爾特的硝煙",
       "event_20200326_cn": "Microlayer Medley",
@@ -739,11 +751,14 @@
       "event_20240725_cn": "幻夢間奏曲",
       "event_20240815_cn": "鐵翼擎風",
       "event_20240829_cn": "埋葬於彼岸之花",
-      "event_20240912_cn": "Ode of Everblooming Crimson",
-      "event_20241024_cn": "Tempesta and the Sleeping Sea",
+      "event_20240912_cn": "喚醒蒼紅之炎",
+      "event_20241024_cn": "颶風與沉眠之海",
       "event_20241121_cn": "危險發明逼近中",
-      "event_20241219_cn": "Substellar Crepuscule",
+      "event_20241219_cn": "星光下的餘暉",
       "event_20250227_cn": "Paradiso of Shackled Light",
+      "event_20250424_cn": "揚起鬱金之旗",
+      "event_20250520_cn": "高塔上的薔薇",
+      "event_20250724_cn": "The Alchemist and the Tower of Horizons",
       "raid_20200624": "特別演習埃塞克斯級(復刻)",
       "raid_20210708": "復刻穿越彼方的水線",
       "raid_20220127": "演習神秘事件調查",
@@ -789,7 +804,11 @@
       "war_archives_20211229_cn": "檔案 逆轉彩虹之塔",
       "war_archives_20220210_cn": "檔案 北境序曲",
       "war_archives_20220224_cn": "檔案 深度回音",
-      "war_archives_20220414_cn": "檔案 永夜幻光"
+      "war_archives_20220324_cn": "檔案 虛像構築之塔",
+      "war_archives_20220414_cn": "檔案 永夜幻光",
+      "war_archives_20220428_cn": "檔案 虹彩的終幕曲",
+      "war_archives_20220526_cn": "檔案 泠誓光庭",
+      "war_archives_20220728_cn": "檔案 雄鷹的敘事歌"
     },
     "Mode": {
       "name": "地圖模式",
@@ -1268,6 +1287,16 @@
       "help": ""
     }
   },
+  "Hospital": {
+    "_info": {
+      "name": "活動設定",
+      "help": ""
+    },
+    "UseRecommendFleet": {
+      "name": "使用艦隊推薦",
+      "help": "如果關閉，需要事先手動為所有15個關卡配隊"
+    }
+  },
   "MaritimeEscort": {
     "_info": {
       "name": "商船護航",
@@ -1289,6 +1318,7 @@
       "easy": "簡單",
       "normal": "普通",
       "hard": "困難",
+      "sp": "sp",
       "ex": "EX"
     },
     "Fleet": {
@@ -1418,6 +1448,9 @@
       "name": "科研過濾器",
       "help": "科研掉落和項目刷新見 https://azur-stats.lyoko.io/，對這些沒有基本了解的人不建議編寫自定義過濾器，建議使用預優化科研過濾器",
       "custom": "自定義",
+      "series_8_blueprint_305": "八期 藍圖+305",
+      "series_8_blueprint_only": "八期 僅藍圖",
+      "series_8_305_only": "八期 僅305",
       "series_7_blueprint_la9": "七期 藍圖+La9",
       "series_7_blueprint_only": "七期 僅藍圖",
       "series_7_la9_only": "七期 僅La9",
@@ -1611,6 +1644,10 @@
       "help": "",
       "level120": "120級",
       "level125": "125級"
+    },
+    "Favourite": {
+      "name": "僅覺醒常用艦船",
+      "help": ""
     }
   },
   "GeneralShop": {
@@ -2015,6 +2052,32 @@
     "Collect": {
       "name": "啟用",
       "help": ""
+    }
+  },
+  "PrivateQuarters": {
+    "_info": {
+      "name": "宿舍計劃",
+      "help": "PrivateQuarters._info.help"
+    },
+    "BuyRoses": {
+      "name": "PrivateQuarters.BuyRoses.name",
+      "help": "PrivateQuarters.BuyRoses.help"
+    },
+    "BuyCake": {
+      "name": "PrivateQuarters.BuyCake.name",
+      "help": "PrivateQuarters.BuyCake.help"
+    },
+    "TargetInteract": {
+      "name": "PrivateQuarters.TargetInteract.name",
+      "help": "PrivateQuarters.TargetInteract.help"
+    },
+    "TargetShip": {
+      "name": "PrivateQuarters.TargetShip.name",
+      "help": "PrivateQuarters.TargetShip.help",
+      "anchorage": "anchorage",
+      "noshiro": "noshiro",
+      "sirius": "sirius",
+      "new_jersey": "new_jersey"
     }
   },
   "Daily": {

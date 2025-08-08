@@ -2,11 +2,11 @@ import re
 from datetime import datetime
 
 from module.campaign.campaign_status import CampaignStatus
-from module.config.config_updater import EVENTS, RAIDS, COALITIONS, GEMS_FARMINGS, MARITIME_ESCORTS
-from module.config.utils import DEFAULT_TIME
+from module.config.config_updater import COALITIONS, EVENTS, GEMS_FARMINGS, HOSPITAL, MARITIME_ESCORTS, RAIDS
+from module.config.utils import DEFAULT_TIME, server_time_offset
 from module.logger import logger
 from module.ui.assets import CAMPAIGN_MENU_NO_EVENT
-from module.ui.page import page_event, page_campaign_menu, page_sp, page_coalition
+from module.ui.page import page_campaign_menu, page_coalition, page_event, page_sp
 from module.war_archives.assets import WAR_ARCHIVES_CAMPAIGN_CHECK
 
 
@@ -24,7 +24,6 @@ class CampaignEvent(CampaignStatus):
                 keys = f'{task}.Scheduler.Enable'
                 logger.info(f'Disable task `{task}`')
                 self.config.cross_set(keys=keys, value=False)
-
             # Reset GemsFarming
             for task in tasks:
                 if task not in GEMS_FARMINGS:
@@ -50,7 +49,7 @@ class CampaignEvent(CampaignStatus):
         limit = int(
             re.sub(r'[,.\'"，。]', '', str(self.config.EventGeneral_PtLimit))
         )
-        tasks = EVENTS + RAIDS + COALITIONS + GEMS_FARMINGS
+        tasks = EVENTS + RAIDS + COALITIONS + GEMS_FARMINGS + HOSPITAL
         command = self.config.Scheduler_Command
         if limit <= 0 or command not in tasks:
             return False
@@ -74,10 +73,10 @@ class CampaignEvent(CampaignStatus):
         Pages:
             in: page_event or page_sp
         """
-        limit = self.config.EventGeneral_TimeLimit
-        tasks = EVENTS + RAIDS + COALITIONS + MARITIME_ESCORTS
+        limit = self.config.EventGeneral_TimeLimit + server_time_offset()
+        tasks = EVENTS + RAIDS + COALITIONS + MARITIME_ESCORTS + HOSPITAL
         command = self.config.Scheduler_Command
-        if command not in tasks or limit == DEFAULT_TIME:
+        if command not in tasks or limit == DEFAULT_TIME + server_time_offset():
             return False
         if command in GEMS_FARMINGS and self.stage_is_main(self.config.Campaign_Name):
             return False
@@ -132,7 +131,7 @@ class CampaignEvent(CampaignStatus):
         """
         if self.appear(CAMPAIGN_MENU_NO_EVENT, offset=(20, 20)):
             logger.info('Event unavailable, disable task')
-            tasks = EVENTS + RAIDS + COALITIONS + GEMS_FARMINGS
+            tasks = EVENTS + RAIDS + COALITIONS + GEMS_FARMINGS + HOSPITAL
             self._disable_tasks(tasks)
             self.config.task_stop()
         else:
