@@ -3,6 +3,7 @@ import module.config.server as server
 from module.base.button import ButtonGrid, get_color, color_similar
 from module.base.decorator import cached_property
 from module.base.timer import Timer
+from module.combat.assets import GET_ITEMS_1
 from module.equipment.equipment import Equipment
 from module.logger import logger
 from module.ocr.ocr import DigitCounter
@@ -80,15 +81,46 @@ class Dock(Equipment):
                 self.handle_dock_cards_loading()
 
     def dock_filter_enter(self):
-        self.ui_click(DOCK_FILTER, appear_button=DOCK_CHECK, check_button=DOCK_FILTER_CONFIRM,
-                      skip_first_screenshot=True)
+        logger.info('Dock filter enter')
+        for _ in self.loop():
+            if self.appear(DOCK_FILTER_CONFIRM, offset=(20, 20)):
+                break
+            if self.appear(DOCK_CHECK, offset=(20, 20), interval=5):
+                self.device.click(DOCK_FILTER)
+                continue
+            # slow popups from last retirement
+            # Equip confirm
+            if self.appear_then_click(EQUIP_CONFIRM, offset=(30, 30), interval=2):
+                continue
+            if self.appear_then_click(EQUIP_CONFIRM_2, offset=(30, 30), interval=2):
+                self.interval_clear(GET_ITEMS_1)
+                continue
+            # Get items
+            if self.appear(GET_ITEMS_1, offset=(30, 30), interval=2):
+                self.device.click(GET_ITEMS_1_RETIREMENT_SAVE)
+                continue
 
-    def dock_filter_confirm(self, wait_loading=True):
+    def dock_filter_confirm(self, wait_loading=True, skip_first_screenshot=True):
         """
         Args:
             wait_loading: Default to True, use False on continuous operation
+            skip_first_screenshot:
         """
-        self.ui_click(DOCK_FILTER_CONFIRM, check_button=DOCK_CHECK, skip_first_screenshot=True)
+        while 1:
+            if skip_first_screenshot:
+                skip_first_screenshot = False
+            else:
+                self.device.screenshot()
+
+            # End
+            # sometimes you have dock filter without black-blurred background
+            # DOCK_FILTER_CONFIRM and DOCK_CHECK appears
+            if not self.appear(DOCK_FILTER_CONFIRM, offset=(20, 20)):
+                if self.appear(DOCK_CHECK, offset=(20, 20)):
+                    break
+            if self.appear_then_click(DOCK_FILTER_CONFIRM, offset=(20, 20), interval=3):
+                continue
+
         if wait_loading:
             self.handle_dock_cards_loading()
 
@@ -118,7 +150,7 @@ class Dock(Equipment):
             option_buttons=ButtonGrid(
                 origin=(218, 268), delta=delta, button_shape=button_shape, grid_shape=(7, 2), name='FILTER_FACTION'),
             option_names=['all', 'eagle', 'royal', 'sakura', 'iron', 'dragon', 'sardegna',
-                          'northern', 'iris', 'vichya', 'other', 'not_available', 'not_available', 'not_available'],
+                          'northern', 'iris', 'vichya', 'tulipa', 'meta', 'tempesta', 'other'],
             option_default='all'
         )
         setting.add_setting(
@@ -133,7 +165,7 @@ class Dock(Equipment):
             option_buttons=ButtonGrid(
                 origin=(218, 471), delta=delta, button_shape=button_shape, grid_shape=(7, 2), name='FILTER_EXTRA'),
             option_names=['no_limit', 'has_skin', 'can_retrofit', 'enhanceable', 'can_limit_break', 'not_level_max', 'can_awaken',
-                          'can_awaken_plus', 'special', 'oath_skin', 'unique_augment_module', 'not_available', 'not_available', 'not_available'],
+                          'can_awaken_plus', 'special', 'oath_skin', 'unique_augment_module', 'wear_skin', 'oathed', 'not_available'],
             option_default='no_limit'
         )
         return setting

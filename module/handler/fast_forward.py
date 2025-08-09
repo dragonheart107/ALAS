@@ -122,8 +122,8 @@ class FastForwardHandler(AutoSearchHandler):
         'C1 > C2 > C3',
         'D1 > D2 > D3',
         'SP1 > SP2 > SP3 > SP4 > SP5',
-        'T1 > T2 > T3 > T4',
-        'HT1 > HT2 > HT3 > HT4',
+        'T1 > T2 > T3 > T4 > T5 > T6',
+        'HT1 > HT2 > HT3 > HT4 > HT5 > HT6',
     ]
     map_fleet_checked = False
 
@@ -205,6 +205,8 @@ class FastForwardHandler(AutoSearchHandler):
 
         state = 'on' if self.config.Campaign_UseClearMode else 'off'
         changed = FAST_FORWARD.set(state, main=self)
+        if changed:
+            self.map_wait_auto_search()
         return changed
 
     def handle_map_fleet_lock(self, enable=None):
@@ -227,6 +229,25 @@ class FastForwardHandler(AutoSearchHandler):
         changed = FLEET_LOCK.set(state, main=self)
 
         return changed
+
+    def map_wait_auto_search(self):
+        """
+        When enabling clear mode (FAST_FORWARD), AUTO_SEARCH has an animation to appear
+        wait until it fully appeared
+
+        Returns:
+            bool: If waited
+        """
+        timeout = Timer(1, count=3).start()
+        for _ in self.loop():
+            state = AUTO_SEARCH.get(main=self)
+            logger.attr('AUTO_SEARCH', state)
+            if state != 'unknown':
+                return True
+            if timeout.reached():
+                # some maps may have clear mode but don't have auto search
+                logger.info('map wait auto search timeout')
+                return False
 
     def handle_auto_search(self):
         """
@@ -319,7 +340,10 @@ class FastForwardHandler(AutoSearchHandler):
         Pages:
             in: MAP_PREPARATION
         """
-        return color_bar_percentage(self.device.image, area=MAP_CLEAR_PERCENTAGE.area, prev_color=(231, 170, 82))
+        percent = color_bar_percentage(self.device.image, area=MAP_CLEAR_PERCENTAGE.area, prev_color=(231, 170, 82))
+        if self.config.MAP_CLEAR_PERCENTAGE_SHORT:
+            percent *= 1.4
+        return percent
 
     def campaign_name_increase(self, name):
         """
