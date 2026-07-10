@@ -210,6 +210,12 @@ class AutoSearchCombat(MapOperation, Combat, CampaignStatus, AutosearchReward):
                             raise CampaignEnd
                     raise CampaignEnd
 
+    def auto_search_combat_end(self):
+        """
+        A custom combat end that used in coalition
+        """
+        return False
+
     def auto_search_combat_execute(self, emotion_reduce, fleet_index):
         """
         Args:
@@ -301,6 +307,8 @@ class AutoSearchCombat(MapOperation, Combat, CampaignStatus, AutosearchReward):
                         or self.appear(EXP_INFO_S) or self.appear(EXP_INFO_A) or self.appear(EXP_INFO_B) \
                         or self.is_auto_search_running():
                     self.device.screenshot_interval_set()
+                    break
+                if self.auto_search_combat_end():
                     break
 
     def auto_search_combat_status(self):
