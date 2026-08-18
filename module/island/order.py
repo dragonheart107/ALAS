@@ -95,7 +95,10 @@ class IslandOrder(IslandUI):
 
     @property
     def requirement_name_grid(self):
-        name_grid = self.requirement_grid.crop((168, 12, 328, 40))
+        if server.server == 'en':
+            name_grid = self.requirement_grid.crop((81, 12, 328, 40))
+        else:
+            name_grid = self.requirement_grid.crop((168, 12, 328, 40))
         return name_grid
 
     @property
@@ -411,3 +414,7 @@ class IslandOrder(IslandUI):
             self.config.task_delay(target=next_runtime, server_update=True)
         else:
             self.config.task_delay(server_update=True)
+
+az = IslandOrder('alas')
+az.device.screenshot()
+az.scan_current_order_requirements()
