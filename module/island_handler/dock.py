@@ -215,3 +215,42 @@ class IslandDock(IslandUI):
                 drag_count = 0
         logger.warning('Failed to find any character not in blacklist')
         return None
+
+    def island_dock_select_named_characters(self, identity_a, identity_b):
+        """
+        Search the dock in a single forward sweep for exactly two named
+        characters, selecting each one immediately as it's found.
+        """
+        found = {identity_a: None, identity_b: None}
+        self.ensure_dock_page_at_top()
+        self.island_dock_sort_method_dsc_set(enable=True)
+        ISLAND_DOCK_DETECT.load_color(self.device.image)
+        ISLAND_DOCK_DETECT._match_init = True
+        drag_count = 0
+        for _ in self.loop(timeout=40, skip_first=False):
+            scanner = CharacterScanner(
+                self.dock_grid,
+                identity=[i for i in (identity_a, identity_b) if found[i] is None],
+                status=None
+            )
+            candidates = scanner.scan(self.device.image)
+            for candidate in candidates:
+                if found.get(candidate.identity) is None and candidate.identity in found:
+                    found[candidate.identity] = candidate
+                    if candidate.status == 'free':
+                        self.island_dock_select_one(candidate.button)
+            if all(v is not None for v in found.values()):
+                break
+            self.next_dock_page()
+            drag_count += 1
+            if self.appear(ISLAND_DOCK_DETECT, offset=(20, 20)):
+                if drag_count >= 2:
+                    logger.warning('Reached end of dock page')
+                    break
+            else:
+                ISLAND_DOCK_DETECT.load_color(self.device.image)
+                drag_count = 0
+        else:
+            missing = [k for k, v in found.items() if v is None]
+            logger.warning(f'Failed to find all requested characters: {missing}')
+        return found
