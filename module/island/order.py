@@ -104,7 +104,7 @@ class IslandOrder(IslandUI):
     @property
     def requirement_counter_grid(self):
         if server.server == 'en':
-            counter_grid = self.requirement_grid.crop((238, 44, 327, 75))
+            counter_grid = self.requirement_grid.crop((238, 44, 326, 70))
         else:
             counter_grid = self.requirement_grid.crop((238, 44, 327, 65))
         return counter_grid
@@ -414,7 +414,3 @@ class IslandOrder(IslandUI):
             self.config.task_delay(target=next_runtime, server_update=True)
         else:
             self.config.task_delay(server_update=True)
-
-az = IslandOrder('alas')
-az.device.screenshot()
-az.scan_current_order_requirements()
