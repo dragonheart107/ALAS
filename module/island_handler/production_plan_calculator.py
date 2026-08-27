@@ -419,6 +419,7 @@ class ProductionPlanCalculator:
         self.product_daily_buffer_items = {}
         self.idle_accumulating_items_per_day = {}
         self.group_usage_summary = {}
+        self.idle_place_ids = []
         self.total_pt = 0
         self.daily_profit = 0
         self.daily_coin_cost = 0
@@ -908,6 +909,17 @@ class ProductionPlanCalculator:
                     for recipe_id, amount, workload in entries
                 }
             }
+        self.idle_place_ids = self._compute_idle_place_ids()
+
+    def _compute_idle_place_ids(self):
+        place_groups = defaultdict(list)
+        for group, place_id in self.GROUP_TO_PLACE.items():
+            place_groups[place_id].append(group)
+        active_groups = set(self.group_usage_summary.keys())
+        return sorted(
+            place_id for place_id, groups in place_groups.items()
+            if not any(group in active_groups for group in groups)
+        )
 
     def _calculate_product_daily_buffer_items(self, solution, activities, sale_entries, activity_count):
         daily_product_demand = defaultdict(float)

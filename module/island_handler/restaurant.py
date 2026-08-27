@@ -358,6 +358,10 @@ class IslandRestaurant(IslandDock):
             if self.is_in_island_dock():
                 break
         success = True
+
+        to_search = [w for w in named_waitresses if w not in unavailable_waitress_list]
+        swept = self.island_dock_select_named_characters(to_search[0], to_search[1]) if len(to_search) == 2 else {}
+
         for waitress in named_waitresses:
             if waitress in unavailable_waitress_list:
                 logger.warning(
@@ -366,11 +370,19 @@ class IslandRestaurant(IslandDock):
                 )
                 unavailable_waitress_list.remove(waitress)
                 continue
-            candidate = self.island_dock_find_character(waitress)
-            if candidate is not None and candidate.status == 'free':
-                self.island_dock_select_one(candidate.button)
-                selected_waitresses.add(candidate.identity)
-                continue
+
+            if swept:
+                candidate = swept.get(waitress)
+                if candidate is not None and candidate.status == 'free':
+                    # already clicked during the sweep
+                    selected_waitresses.add(candidate.identity)
+                    continue
+            else:
+                candidate = self.island_dock_find_character(waitress)
+                if candidate is not None and candidate.status == 'free':
+                    self.island_dock_select_one(candidate.button)
+                    selected_waitresses.add(candidate.identity)
+                    continue
 
             if candidate is not None:
                 time_until_update = get_server_next_update("00:00") - datetime.now()

@@ -781,6 +781,71 @@ IslandProduction:
     type: textarea
     value: |-
       {}
+  UseNamedWorkers:
+    type: checkbox
+    value: false
+    option: [ true, false ]
+  WorkerPoolField:
+    type: textarea
+    value: ''
+  WorkerPoolRanchChicken:
+    type: textarea
+    value: ''
+  WorkerPoolRanchPig:
+    type: textarea
+    value: ''
+  WorkerPoolRanchCow:
+    type: textarea
+    value: ''
+  WorkerPoolRanchSheep:
+    type: textarea
+    value: ''
+  WorkerPoolFishery:
+    type: textarea
+    value: ''
+  WorkerPoolMine:
+    type: textarea
+    value: ''
+  WorkerPoolWood:
+    type: textarea
+    value: ''
+  WorkerPoolOrchard:
+    type: textarea
+    value: ''
+  WorkerPoolNursery:
+    type: textarea
+    value: ''
+  WorkerPoolKoi:
+    type: textarea
+    value: ''
+  WorkerPoolBear:
+    type: textarea
+    value: ''
+  WorkerPoolEatery:
+    type: textarea
+    value: ''
+  WorkerPoolGrill:
+    type: textarea
+    value: ''
+  WorkerPoolLumber:
+    type: textarea
+    value: ''
+  WorkerPoolMachinery:
+    type: textarea
+    value: ''
+  WorkerPoolElectronic:
+    type: textarea
+    value: ''
+  WorkerPoolCrafts:
+    type: textarea
+    value: ''
+  WorkerPoolCafe:
+    type: textarea
+    value: ''
+  MinStaminaToAssign: 0
+  ReservedCharacters:
+    type: textarea
+    value: ''
 IslandOrder:
   StuckSeasonOrderId: 0
 IslandFreebie:

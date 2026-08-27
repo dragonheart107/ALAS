@@ -9,6 +9,9 @@ from module.island.assets import *
 from module.island.data import DIC_ISLAND_PRODUCTION_PLACE
 from module.island_handler.dock import IslandDock
 from module.island_handler.dock_scanner import CharacterScanner
+from module.island_handler.production_worker_config import (
+    WORKER_MANJUU, get_effective_worker_pool, get_min_stamina, get_use_named_workers,
+)
 from module.island_handler.recipe import IslandProductionRestart, IslandRecipe
 from module.logger import logger
 from module.map_detection.utils import Points
@@ -211,7 +214,30 @@ class IslandProduction(IslandRecipe, IslandDock):
             if not self.next_page():
                 break
 
-    def dispatch_slot(self, slot_id, slot_button, worker='manjuu'):
+    def dispatch_slot(self, slot_id, slot_button, pool, dispatched_characters,
+                       excluded_characters=None, min_stamina_floor=None):
+        """
+        Args:
+            slot_id (int):
+            slot_button (Button):
+            pool (list[str]): Priority-ordered character names from config.
+            dispatched_characters (set[str]): Mutated in place as characters get dispatched.
+            excluded_characters (set[str], optional): Pool characters already tried
+                and failed for this slot this attempt - excluded from re-selection,
+                but NOT marked as globally dispatched, since they never actually
+                produced anything and remain free for other slots.
+            min_stamina_floor (int, optional): Overrides the configured minimum
+                stamina. Used internally on retry, raised past the emotion of the
+                character that just failed, so only candidates with a genuine
+                chance (strictly higher stamina) are tried next, before falling
+                back to Manjuu once the pool is exhausted.
+
+        Returns:
+            bool: True if dispatch succeeded, False otherwise.
+        """
+        if excluded_characters is None:
+            excluded_characters = set()
+
         if slot_id in DIC_ISLAND_PRODUCTION_PLACE[102]['slot']:
             del_cached_property(super(), 'recipe_id_sequence')
             del_cached_property(super(), 'all_recipe_stocks')
@@ -223,21 +249,31 @@ class IslandProduction(IslandRecipe, IslandDock):
             if self.match_template_color(page_island_manage.check_button, interval=1) and not self.is_enter_window_shown():
                 self.device.click(slot_button)
                 continue
-        if worker != 'manjuu':
-            character = self.island_dock_find_character(worker)
-            if not character or character.status != 'free':
-                logger.warning(f'Failed to select character {worker} for slot {slot_id}, try to select manjuu instead')
-                worker = 'manjuu'
-                self.ensure_dock_page_at_top()
-            else:
-                self.island_dock_select_one(character.button)
-        if worker == 'manjuu':
+
+        selected_character = None
+        if get_use_named_workers(self.config):
+            min_stamina = min_stamina_floor if min_stamina_floor is not None else get_min_stamina(self.config)
+            search_exclusions = dispatched_characters | excluded_characters
+            selected_character = self.island_dock_find_characters_from_pool(pool, search_exclusions, min_stamina)
+
+        worker = WORKER_MANJUU
+        if selected_character:
+            worker = selected_character.identity
+            logger.info(f'Selected {worker} for slot {slot_id} (emotion: {selected_character.emotion})')
+            self.island_dock_select_one(selected_character.button)
+
+        if worker == WORKER_MANJUU:
             self.island_dock_select_manjuu()
+
+        # Confirm selection and start production
         self.island_dock_select_confirm(self.is_in_recipe_menu)
         target_time = super().run(slot_id=slot_id)
+
         if target_time is not None:
             target_time = target_time.replace(microsecond=0)
             self.slot_finish_time[slot_id] = target_time
+            if worker != WORKER_MANJUU:
+                dispatched_characters.add(worker)
             for _ in self.loop(timeout=5):
                 if self.handle_island_additional():
                     continue
@@ -250,20 +286,53 @@ class IslandProduction(IslandRecipe, IslandDock):
                 del_cached_property(super(), 'all_recipe_stocks')
             self.ui_back(check_button=page_island_manage.check_button)
             self.ensure_island_production_page()
-            return False
 
-    def dispatch_place(self, place_id):
+            if worker == WORKER_MANJUU:
+                return False
+            worker_limited = getattr(self, 'recipe_worker_limited', False)
+            if not worker_limited:
+                logger.info(
+                    f'Slot {slot_id} failed due to insufficient ingredients or no production demand, '
+                    f'not a worker limitation - skipping retry with a different character'
+                )
+                return False
+            del_cached_property(super(), 'recipe_id_sequence')
+            logger.info(
+                f'Retrying slot {slot_id}: {worker} (emotion {selected_character.emotion}) failed to produce '
+                f'anything, trying a higher-stamina pool candidate next, then Manjuu if none remain'
+            )
+            return self.dispatch_slot(
+                slot_id, slot_button, pool, dispatched_characters,
+                excluded_characters=excluded_characters | {worker},
+                min_stamina_floor=selected_character.emotion + 1,
+            )
+
+    def dispatch_place(self, place_id, dispatched_characters):
+        """
+        Args:
+            place_id (int):
+            dispatched_characters (set[str]): Mutated in place as characters get dispatched.
+        """
         if place_id not in self.slot_grids:
             logger.error(f'Place id {place_id} not found in current production page')
             return False
         slot_grid = self.slot_grids[place_id]
+        is_ranch = place_id == 102
         is_first = True
         for slot_id, slot_button in zip(DIC_ISLAND_PRODUCTION_PLACE[place_id]['slot'], slot_grid.buttons):
-            if not is_first and has_cached_property(super(), 'recipe_id_sequence') and not self.recipe_id_sequence:
+            if is_ranch:
+                # Each ranch slot is an independent product (chicken/pig/cow/sheep) -
+                # a previous slot's exhausted recipe_id_sequence must never be reused
+                # to decide whether to skip this one, since it has nothing to do
+                # with this slot's own ingredient stock.
+                del_cached_property(super(), 'recipe_id_sequence')
+                del_cached_property(super(), 'all_recipe_stocks')
+            elif not is_first and has_cached_property(super(), 'recipe_id_sequence') and not self.recipe_id_sequence:
                 logger.info(f'No more recipe for place {place_id}, skip remaining slots')
                 break
             if self.is_slot_empty(slot_button):
-                self.dispatch_slot(slot_id=slot_id, slot_button=slot_button, worker='manjuu')
+                pool = get_effective_worker_pool(self.config, place_id, slot_id=slot_id)
+                self.dispatch_slot(slot_id=slot_id, slot_button=slot_button, pool=pool, dispatched_characters=dispatched_characters)
             if is_first:
                 is_first = False
         del_cached_property(super(), 'recipe_id_sequence')
@@ -274,11 +343,12 @@ class IslandProduction(IslandRecipe, IslandDock):
         self.ensure_top_page()
         self.failed_buy_items = set()
         dispatched_places = set()
+        dispatched_characters = set()
         while 1:
             try:
                 for place_id in self.slot_grids.keys():
                     if place_id not in dispatched_places:
-                        self.dispatch_place(place_id)
+                        self.dispatch_place(place_id, dispatched_characters)
                         dispatched_places.add(place_id)
                 if not self.next_page():
                     break

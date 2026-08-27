@@ -2660,6 +2660,96 @@
     "IdleAccumulatingItems": {
       "name": "アイドル累積品目",
       "help": "生産が空いていて素材が十分なときに累積してよい品目です。\n値はアイドル時のレシピ優先度に使う想定日次累積速度です。\nこれはツール内の島生産プランナーで自動生成できます。"
+    },
+    "UseNamedWorkers": {
+      "name": "指定キャラクターを使用",
+      "help": "有効にすると、生産スロットは饅頭より先に艦娘を使用します",
+      "True": "有効",
+      "False": "無効"
+    },
+    "WorkerPoolField": {
+      "name": "豊穣の畑",
+      "help": ""
+    },
+    "WorkerPoolRanchChicken": {
+      "name": "悠々牧場（鶏）",
+      "help": ""
+    },
+    "WorkerPoolRanchPig": {
+      "name": "悠々牧場（豚）",
+      "help": ""
+    },
+    "WorkerPoolRanchCow": {
+      "name": "悠々牧場（牛）",
+      "help": ""
+    },
+    "WorkerPoolRanchSheep": {
+      "name": "悠々牧場（羊）",
+      "help": ""
+    },
+    "WorkerPoolFishery": {
+      "name": "饅頭いけす",
+      "help": ""
+    },
+    "WorkerPoolMine": {
+      "name": "積岩鉱山",
+      "help": ""
+    },
+    "WorkerPoolWood": {
+      "name": "翠緑の森",
+      "help": ""
+    },
+    "WorkerPoolOrchard": {
+      "name": "薫る果樹園",
+      "help": ""
+    },
+    "WorkerPoolNursery": {
+      "name": "青々苗場",
+      "help": ""
+    },
+    "WorkerPoolKoi": {
+      "name": "有魚飯店",
+      "help": ""
+    },
+    "WorkerPoolBear": {
+      "name": "白クマ茶房",
+      "help": ""
+    },
+    "WorkerPoolEatery": {
+      "name": "饅頭軽食",
+      "help": ""
+    },
+    "WorkerPoolGrill": {
+      "name": "烏魚焼肉",
+      "help": ""
+    },
+    "WorkerPoolLumber": {
+      "name": "木材加工",
+      "help": ""
+    },
+    "WorkerPoolMachinery": {
+      "name": "工作機械",
+      "help": ""
+    },
+    "WorkerPoolElectronic": {
+      "name": "電子部品加工",
+      "help": ""
+    },
+    "WorkerPoolCrafts": {
+      "name": "手工作業台",
+      "help": ""
+    },
+    "WorkerPoolCafe": {
+      "name": "饅頭カフェ",
+      "help": "IslandProduction.WorkerPoolCafe.help"
+    },
+    "MinStaminaToAssign": {
+      "name": "配属に必要な最低スタミナ",
+      "help": "キャラクターが生産スロットに配属される前に必要な最低スタミナ\n他のタスクへの割り込みを減らしたい場合は、より高い値を設定してください"
+    },
+    "ReservedCharacters": {
+      "name": "予約キャラクター",
+      "help": "ここに記載されたキャラクターは、上記の人材プールに含まれていても生産スロットに配属されません"
     }
   },
   "IslandOrder": {

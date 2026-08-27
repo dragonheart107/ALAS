@@ -12,7 +12,6 @@ from module.base.button import ButtonGrid
 from module.base.decorator import cached_property, del_cached_property
 from module.base.timer import Timer
 from module.base.utils import color_similarity_2d, extract_letters, random_rectangle_vector_opted
-from module.exception import GameTooManyClickError
 from module.island.data import DIC_ISLAND_ITEM, DIC_ISLAND_RECIPE, DIC_ISLAND_SHOP_ITEM_TO_RECIPE, DIC_ISLAND_SLOT
 from module.island.utils import (
     ceil_div_or_ceil,
@@ -758,30 +757,62 @@ class IslandRecipe(IslandExchange, IslandShop):
         return success, real_count
 
     def set_recipe_batch_count(self, batch_count=float('inf')):
+        """
+        Returns:
+            tuple[bool, int | None]: (success, capped_count)
+                capped_count is None when the full requested batch_count was set,
+                or an int when the amount stalled below batch_count but was still
+                accepted as a reduced amount.
+        """
         for _ in self.loop():
             if self.appear_then_click(ISLAND_RECIPE_AMOUNT_MAX, offset=(20, 20)):
                 self.device.screenshot()
                 break
         if batch_count == float('inf'):
             logger.info('Set recipe amount to max')
-            return True
+            return True, None
+
+        logger.info(f'Set recipe amount to {batch_count}')
+        current = ISLAND_RECIPE_AMOUNT_OCR.ocr(self.device.image)
+        if current < batch_count:
+            counters = self.get_recipe_ingredient_counters()
+            for counter in counters:
+                if counter[2] < 0:
+                    logger.warning('Insufficient ingredient for next recipe amount, cannot set recipe amount to desired value')
+                    return False, None
+
+        # Drive the amount toward batch_count with our own bounded loop rather than
+        # ui_ensure_index, which is a bare `while 1` with no timeout or click ceiling
+        # of its own - if batch_count is genuinely unreachable (e.g. a stamina-capped
+        # character), it retries multi_click forever with no way out.
+        last_value = current
+        stall_count = 0
+        STALL_LIMIT = 6
+        for _ in self.loop(timeout=15):
+            value = ISLAND_RECIPE_AMOUNT_OCR.ocr(self.device.image)
+            if value == batch_count:
+                return True, None
+            if value == last_value:
+                stall_count += 1
+                if stall_count >= STALL_LIMIT:
+                    break
+            else:
+                stall_count = 0
+            last_value = value
+            button = ISLAND_RECIPE_AMOUNT_PLUS if value < batch_count else ISLAND_RECIPE_AMOUNT_MINUS
+            self.device.click(button)
         else:
-            logger.info(f'Set recipe amount to {batch_count}')
-            if ISLAND_RECIPE_AMOUNT_OCR.ocr(self.device.image) < batch_count:
-                # Check if already at max, if so, cannot set to desired amount
-                counters = self.get_recipe_ingredient_counters()
-                for counter in counters:
-                    if counter[2] < 0:
-                        logger.warning('Insufficient ingredient for next recipe amount, cannot set recipe amount to desired value')
-                        return False
-            try:
-                self.ui_ensure_index(index=batch_count, letter=ISLAND_RECIPE_AMOUNT_OCR,
-                                 next_button=ISLAND_RECIPE_AMOUNT_PLUS,
-                                 prev_button=ISLAND_RECIPE_AMOUNT_MINUS,)
-                return True
-            except GameTooManyClickError:
-                logger.warning('Too many clicks when setting recipe amount, failed to set recipe amount')
-                return False
+            logger.warning('Timed out setting recipe amount')
+
+        stalled_count = last_value
+        if 0 < stalled_count < batch_count:
+            logger.warning(
+                f'Recipe amount stalled at {stalled_count} instead of requested {batch_count}, '
+                f'will attempt to start with this reduced amount'
+            )
+            return True, stalled_count
+        logger.warning('Too many clicks when setting recipe amount, failed to set recipe amount')
+        return False, None
 
     def get_recipe_remain_time(self):
         if self.match_template_color(ISLAND_RECIPE_TIME_ANCHOR, offset=(100, 20)):
@@ -817,12 +848,17 @@ class IslandRecipe(IslandExchange, IslandShop):
         if not success:
             logger.warning(f'Failed to prepare enough ingredient for {batch_count} batch(es) production')
             logger.info(f'Can only produce {real_count} batch(es) with current ingredient stock, will try to run with this amount')
-        if not self.set_recipe_batch_count(real_count):
+        batch_set_success, stalled_count = self.set_recipe_batch_count(real_count)
+        if not batch_set_success:
             logger.warning(f'Failed to set recipe batch count to {"max" if real_count == float("inf") else real_count}, cannot run recipe')
             return None
+        if stalled_count is not None:
+            real_count = stalled_count
         remain_time = self.get_recipe_remain_time()
         logger.attr('Recipe_remain_time', remain_time)
         if remain_time is not None:
+            if stalled_count is not None:
+                logger.info(f'Recipe amount stall at {stalled_count} was accepted by the game, likely a genuine stamina cap')
             for _ in self.loop():
                 if self.appear_then_click(ISLAND_RECIPE_TIME_ANCHOR, offset=(100, 20), interval=2):
                     continue
@@ -831,6 +867,13 @@ class IslandRecipe(IslandExchange, IslandShop):
             logger.info(f'Recipe {recipe_id} started with amount {"max" if real_count == float("inf") else real_count}, remain time: {remain_time}')
             return remain_time, real_count
         else:
+            # Ingredients were already confirmed sufficient above (real_count > 0
+            # reached this point), so a failure to start here is not an ingredient
+            # problem - flag it as potentially worker-related so the caller knows
+            # a retry with a different character is worth attempting.
+            self.recipe_worker_limited = True
+            if stalled_count is not None:
+                logger.warning(f'Recipe amount stall at {stalled_count} was not accepted by the game, recipe did not start')
             logger.warning('Failed to get recipe remain time, recipe may not have started successfully')
             return None
 
@@ -863,6 +906,7 @@ class IslandRecipe(IslandExchange, IslandShop):
             target_time (datetime): timestamp of when the recipe will finish, or None if failed to run any recipe
         """
         self.working_slot_id = slot_id
+        self.recipe_worker_limited = False
         del_cached_property(self, 'recipe_grid')
         del_cached_property(self, 'recipe_ids')
         while self.recipe_id_sequence:
@@ -896,6 +940,18 @@ class IslandRecipe(IslandExchange, IslandShop):
                 self.update_recipe_id_sequence_and_stock(recipe_id, real_count)
                 return target_time
             else:
+                if self.recipe_worker_limited:
+                    # Rejected specifically because the assigned worker couldn't
+                    # produce it (ingredients were confirmed sufficient beforehand),
+                    # not because nothing can be made. Stop here instead of falling
+                    # through to a lower-priority recipe the worker happens to be
+                    # able to afford - the caller should retry this same recipe
+                    # with a stronger worker instead.
+                    logger.info(
+                        f'Recipe {recipe_id} rejected by the assigned worker, '
+                        f'stopping instead of falling back to lower-priority recipes'
+                    )
+                    return None
                 unavailable_product = getattr(self, 'last_unavailable_product', None)
                 if unavailable_product is not None:
                     logger.info(
