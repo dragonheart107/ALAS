@@ -411,6 +411,10 @@ class IslandDock(IslandUI):
         
         for page in range(MAX_PAGES):
             logger.info(f'Processing page {page + 1}/{MAX_PAGES}')
+
+            # Fresh screenshot for this page, used for both scanning and template crops.
+            self.device.screenshot()
+            clean_image = self.device.image
             
             # Get all cards on current page
             scanner = CharacterScanner(self.dock_grid, identity='any', status=None)
@@ -500,8 +504,10 @@ class IslandDock(IslandUI):
                         card_area[0] + TEMPLATE_AREA[2],
                         card_area[1] + TEMPLATE_AREA[3]
                     )
-                    
-                    img_np = self.image_crop(template_area, copy=True)
+
+                    from module.base.utils import crop
+
+                    img_np = crop(clean_image, template_area)   # <-- use the pre-click page screenshot
                     Image.fromarray(img_np).save(os.path.join(folder_path, filename))
                     
                     existing_templates.add(filename[:-4].lower())
@@ -526,3 +532,8 @@ class IslandDock(IslandUI):
         logger.info(f'Templates saved to: {folder_path}')
         self.ensure_dock_page_at_top()
         return True
+    
+# python -m module.island_handler.dock
+az = IslandDock('alas')
+az.device.screenshot()
+az.extract_character_templates()
