@@ -1950,6 +1950,7 @@
       "DailyBufferItems": "{}",
       "ManualBufferItems": "{}",
       "IdleAccumulatingItems": "{}",
+      "SkipBufferSurplus": true,
       "UseNamedWorkers": false,
       "WorkerPoolField": null,
       "WorkerPoolRanchChicken": null,

@@ -9464,6 +9464,10 @@
         "type": "textarea",
         "value": "{}"
       },
+      "SkipBufferSurplus": {
+        "type": "checkbox",
+        "value": true
+      },
       "UseNamedWorkers": {
         "type": "checkbox",
         "value": false,

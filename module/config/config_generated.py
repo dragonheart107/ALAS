@@ -451,6 +451,7 @@ class GeneratedConfig:
     IslandProduction_DailyBufferItems = '{}'
     IslandProduction_ManualBufferItems = '{}'
     IslandProduction_IdleAccumulatingItems = '{}'
+    IslandProduction_SkipBufferSurplus = True
     IslandProduction_UseNamedWorkers = False  # True, False
     IslandProduction_WorkerPoolField = None
     IslandProduction_WorkerPoolRanchChicken = None
