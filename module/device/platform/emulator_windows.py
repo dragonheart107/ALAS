@@ -110,6 +110,8 @@ class Emulator(EmulatorBase):
                 return cls.LDPlayer4
             elif dir1 == 'ldplayer9':
                 return cls.LDPlayer9
+            elif dir1 == 'ldplayer14':
+                return cls.LDPlayer14
             else:
                 return cls.LDPlayer3
         if exe == 'nemuplayer.exe':
@@ -169,7 +171,7 @@ class Emulator(EmulatorBase):
         if 'MuMuPlayer.exe' in exe:
             return exe.replace('MuMuPlayer.exe', 'MuMuManager.exe')
         # MuMuPlayer12 5.0
-        elif 'MuMuPlayer.exe' in exe:
+        elif 'MuMuNxMain.exe' in exe:
             return exe.replace('MuMuNxMain.exe', 'MuMuManager.exe')
         elif 'LDPlayer.exe' in exe:
             return exe.replace('LDPlayer.exe', 'ldconsole.exe')
@@ -538,8 +540,11 @@ class EmulatorManager(EmulatorManagerBase):
                 exe.add(file)
 
         # LDPlayer install path
-        for path in [r'SOFTWARE\leidian\ldplayer',
-                     r'SOFTWARE\leidian\ldplayer9']:
+        for path in [
+            r'SOFTWARE\leidian\ldplayer',
+            r'SOFTWARE\leidian\ldplayer9',
+            r'SOFTWARE\leidian\ldplayer14',
+        ]:
             ld = self.get_install_dir_from_reg(path, 'InstallDir')
             if ld:
                 ld = abspath(os.path.join(ld, './dnplayer.exe'))

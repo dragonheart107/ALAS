@@ -1,13 +1,11 @@
 from module.combat.combat import *
-from module.combat.combat import QUIT
 from module.exercise.assets import *
-from module.exercise.equipment import ExerciseEquipment
 from module.exercise.hp_daemon import HpDaemon
 from module.exercise.opponent import OPPONENT, OpponentChoose
 from module.ui.assets import EXERCISE_CHECK
 
 
-class ExerciseCombat(HpDaemon, OpponentChoose, ExerciseEquipment, Combat):
+class ExerciseCombat(HpDaemon, OpponentChoose, Combat):
     def _in_exercise(self):
         return self.appear(EXERCISE_CHECK, offset=(20, 20))
 
@@ -67,25 +65,33 @@ class ExerciseCombat(HpDaemon, OpponentChoose, ExerciseEquipment, Combat):
             else:
                 self.low_hp_confirm_timer.reset()
                 # Finish - S or D rank
-                if self.appear_then_click(BATTLE_STATUS_S, interval=1):
+                if self.appear(BATTLE_STATUS_S, interval=1):
+                    logger.info(f'{BATTLE_STATUS_S} -> {CLICK_SAFE_AREA}')
+                    self.device.click(CLICK_SAFE_AREA)
                     success = True
                     end = True
                     battle_status_detected = True
                     continue
-                if self.appear_then_click(BATTLE_STATUS_D, interval=1):
+                if self.appear(BATTLE_STATUS_D, interval=1):
+                    logger.info(f'{BATTLE_STATUS_D} -> {CLICK_SAFE_AREA}')
+                    self.device.click(CLICK_SAFE_AREA)
                     success = True
                     end = True
                     battle_status_detected = True
                     logger.info("Exercise LOST")
                     continue
-            
+
             # Only handle GET_ITEMS_1 after battle status
-            if battle_status_detected and self.appear_then_click(GET_ITEMS_1, offset=(30, 30), interval=1):
+            if battle_status_detected and self.appear(GET_ITEMS_1, offset=(30, 30), interval=1):
+                logger.info(f'{GET_ITEMS_1} -> {CLICK_SAFE_AREA}')
+                self.device.click(CLICK_SAFE_AREA)
                 continue
             if self.appear(EXP_INFO_S, interval=1):
+                logger.info(f'{EXP_INFO_S} -> {CLICK_SAFE_AREA}')
                 self.device.click(CLICK_SAFE_AREA)
                 continue
             if self.appear(EXP_INFO_D, interval=1):
+                logger.info(f'{EXP_INFO_D} -> {CLICK_SAFE_AREA}')
                 self.device.click(CLICK_SAFE_AREA)
                 continue
             # Last D rank screen
@@ -100,8 +106,7 @@ class ExerciseCombat(HpDaemon, OpponentChoose, ExerciseEquipment, Combat):
                 success = False
                 end = True
                 continue
-            if self.appear_then_click(QUIT_RECONFIRM, offset=(20, 20), interval=5):
-                self.interval_reset(QUIT)
+            if self.handle_combat_quit_reconfirm():
                 pause_interval.reset()
                 continue
             if not end:
@@ -185,23 +190,3 @@ class ExerciseCombat(HpDaemon, OpponentChoose, ExerciseEquipment, Combat):
 
         self._preparation_quit()
         return False
-
-    def equipment_take_off_when_finished(self):
-        if self.config.EXERCISE_FLEET_EQUIPMENT is None:
-            return False
-        if not self.equipment_has_take_on:
-            return False
-
-        self._choose_opponent(0)
-        self.equipment_take_off()
-        self._preparation_quit()
-
-    def equipment_take_on(self):
-        if self.config.EXERCISE_FLEET_EQUIPMENT is None:
-            return False
-        if self.equipment_has_take_on:
-            return False
-
-        self._choose_opponent(0)
-        super().equipment_take_on()
-        self._preparation_quit()

@@ -19,6 +19,7 @@ FILTER_REGEX = re.compile(
     '|chip|coin|cube|drill|food'
     '|plate|retrofit|pr|dr|specializedcore'
     '|logger|tuning'
+    '|type93pureoxygentorpedo|type1armorpiercingshell|superheavyshell'
     '|hecombatplan|fragment|hiddenzonedatalogger'
     '|albacore|bataan|bearn|bluegill|carabiniere|casablanca|contedicavour|dukeofyork'
     '|echo|eldridge|gangut|glorious|grenville|hibiki|hunter|icarus'
@@ -124,17 +125,6 @@ class ShopBase(UI):
         return ''
 
     @cached_property
-    @Config.when(SERVER='tw')
-    def shop_grid(self):
-        """
-        Returns:
-            ButtonGrid:
-        """
-        shop_grid = ButtonGrid(
-            origin=(476, 246), delta=(156, 213), button_shape=(98, 98), grid_shape=(5, 2), name='SHOP_GRID')
-        return shop_grid
-
-    @cached_property
     @Config.when(SERVER=None)
     def shop_grid(self):
         """
@@ -143,7 +133,7 @@ class ShopBase(UI):
             ButtonGrid:
         """
         shop_grid = ButtonGrid(
-            origin=(226, 238), delta=(162, 217), button_shape=(64, 64), grid_shape=(5, 2), name='SHOP_GRID')
+            origin=(265, 238), delta=(169, 223), button_shape=(64, 64), grid_shape=(5, 2), name='SHOP_GRID')
         return shop_grid
 
     def shop_items(self):
@@ -228,7 +218,7 @@ class ShopBase(UI):
             bool:
         """
         # Handle shop obstructions
-        if self.appear(GET_SHIP, interval=1):
+        if self.appear(GET_SHIP, offset=(20, 20), interval=1):
             logger.info(f'Shop obstruct: {GET_SHIP} -> {SHOP_CLICK_SAFE_AREA}')
             self.device.click(SHOP_CLICK_SAFE_AREA)
             return True
@@ -369,6 +359,8 @@ class ShopBase(UI):
 
         # Second, load selection, apply filter,
         # and return 1st item in result if any
+        if not self.shop_filter:
+            return None
         FILTER.load(self.shop_filter)
         filtered = FILTER.apply(items, self.shop_check_item)
 

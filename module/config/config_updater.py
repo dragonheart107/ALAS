@@ -466,6 +466,8 @@ class ConfigGenerator:
                 latest[server] = deep_get(self.args, keys=f'{task}.Campaign.Event.option_{server}', default=[])
             options = set().union(*latest.values())
             options = sorted([option for option in options if option != 'campaign_main'])
+            if task not in WAR_ARCHIVES:
+                deep_set(self.args, keys=f'{task}.Campaign.Event.option_bold', value=options)
             deep_set(self.args, keys=f'{task}.Campaign.Event.option', value=options)
 
     @staticmethod
@@ -593,7 +595,7 @@ class ConfigUpdater:
         # 2025.04.17
         # ('Coalition.Coalition.Mode', 'Coalition.Coalition.Mode', coalition_to_frostfall),
         # 2025.06.26
-        ('Coalition.Coalition.Mode', 'Coalition.Coalition.Mode', coalition_to_little_academy),
+        # ('Coalition.Coalition.Mode', 'Coalition.Coalition.Mode', coalition_to_little_academy),
     ]
 
     # redirection += [
@@ -638,27 +640,31 @@ class ConfigUpdater:
             deep_set(new, 'Alas.DropRecord.AzurStatsID', None)
         else:
             deep_default(new, 'Alas.DropRecord.AzurStatsID', random_id())
+        if deep_get(new, keys='OpsiHazard1Leveling.Scheduler.Enable'):
+            deep_set(new, keys='OpsiMeowfficerFarming.Scheduler.Enable', value=True)
         # Update to latest event
         server = to_server(deep_get(new, 'Alas.Emulator.PackageName', 'cn'))
         if not is_template:
             for task in EVENTS + RAIDS + COALITIONS:
                 opts = deep_get(self.args, keys=f'{task}.Campaign.Event.option_{server}', default=[])
-                if not deep_get(new, keys=f'{task}.Campaign.Event', default='campaign_main') in opts:
+                if opts and not deep_get(new, keys=f'{task}.Campaign.Event', default='campaign_main') in opts:
                     deep_set(new,
                              keys=f'{task}.Campaign.Event',
                              value=opts[0])
 
             for task in ['GemsFarming']:
-                if deep_get(new, keys=f'{task}.Campaign.Event', default='campaign_main') != 'campaign_main':
+                opts = deep_get(self.args, keys=f'{task}.Campaign.Event.option_{server}', default=[])
+                if opts and deep_get(new, keys=f'{task}.Campaign.Event', default='campaign_main') not in opts:
                     deep_set(new,
                              keys=f'{task}.Campaign.Event',
-                             value=deep_get(self.args, f'{task}.Campaign.Event.option_{server}')[0])
+                             value=opts[0])
         # War archive does not allow campaign_main
         for task in WAR_ARCHIVES:
-            if deep_get(new, keys=f'{task}.Campaign.Event', default='campaign_main') == 'campaign_main':
+            opts = deep_get(self.args, keys=f'{task}.Campaign.Event.option_{server}', default=[])
+            if opts and deep_get(new, keys=f'{task}.Campaign.Event', default='campaign_main') == 'campaign_main':
                 deep_set(new,
                          keys=f'{task}.Campaign.Event',
-                         value=deep_get(self.args, f'{task}.Campaign.Event.option_{server}')[0])
+                         value=opts[0])
 
         # Events does not allow default stage 12-4
         def default_stage(t, stage):
@@ -668,7 +674,7 @@ class ConfigUpdater:
         for task in EVENTS + WAR_ARCHIVES:
             default_stage(task, 'D3')
         for task in COALITIONS:
-            default_stage(task, 'hard')
+            default_stage(task, 'area1-normal')
 
         if not is_template:
             new = self.config_redirect(old, new)

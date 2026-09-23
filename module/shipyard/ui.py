@@ -1,20 +1,22 @@
 from module.base.decorator import cached_property
 from module.base.timer import Timer
 from module.base.utils import area_pad
+from module.campaign.campaign_status import OCR_COIN
 from module.handler.assets import LOGIN_ANNOUNCE
 from module.logger import logger
 from module.shipyard.ui_globals import *
 from module.ui.assets import SHIPYARD_CHECK
 from module.ui.navbar import Navbar
+from module.ui.page import page_main_white
 from module.ui.ui import UI
 
 
 class ShipyardNavbar(Navbar):
     def is_button_active(self, button, main):
-        if main.image_color_count(button, color=(33, 113, 222), threshold=221, count=400):
+        if main.image_color_count(button, color=(33, 113, 222), threshold=30, count=400):
             return True
         # Color on Odin's shoulder
-        if main.image_color_count(button, color=(41, 85, 165), threshold=221, count=400):
+        if main.image_color_count(button, color=(41, 85, 165), threshold=30, count=400):
             return True
         return False
 
@@ -180,7 +182,7 @@ class ShipyardUI(UI):
         """
         return ShipyardNavbar(
             grids=SHIPYARD_FACE_GRID,
-            inactive_color=(49, 60, 82), inactive_threshold=221, inactive_count=50)
+            inactive_color=(49, 60, 82), inactive_threshold=30, inactive_count=50)
 
     def shipyard_bottom_navbar_ensure(self, left=None, right=None, skip_first_screenshot=True):
         """
@@ -267,7 +269,7 @@ class ShipyardUI(UI):
                 confirm_timer.reset()
                 continue
 
-            if self.appear_then_click(GET_SHIP, interval=1):
+            if self.appear_then_click(GET_SHIP, offset=(20, 20), interval=1):
                 confirm_timer.reset()
                 continue
 
@@ -371,3 +373,13 @@ class ShipyardUI(UI):
             self.wait_until_appear(SHIPYARD_IN_FATE, offset=(20, 20))
 
         return True
+
+    def _shipyard_get_coin(self):
+        """
+        Returns:
+            int: Coin amount
+        """
+        if self.ui_page_appear(page_main_white):
+            return MAIN_OCR_COIN.ocr(self.device.image)
+        else:
+            return OCR_COIN.ocr(self.device.image)

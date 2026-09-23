@@ -19,7 +19,7 @@ class CoalitionCombat(CoalitionUI, CampaignBase):
         logger.info('Coalition combat re-enter')
         status_clicked = False
         click_timer = Timer(0.3)
-        click_last = Timer(2)
+        click_last = Timer(1, count=3)
         while 1:
             if skip_first_screenshot:
                 skip_first_screenshot = False
@@ -28,6 +28,8 @@ class CoalitionCombat(CoalitionUI, CampaignBase):
 
             # End
             if self.is_combat_loading():
+                break
+            if self.is_combat_executing():
                 break
             if self.in_coalition():
                 raise CampaignEnd
@@ -39,6 +41,9 @@ class CoalitionCombat(CoalitionUI, CampaignBase):
                 # Stop clicking BATTLE_STATUS because combat ends
                 status_clicked = False
                 continue
+            # Coalition 20251120 has ship drop
+            if self.handle_get_ship():
+                continue
             if self.handle_battle_status():
                 status_clicked = True
                 click_last.reset()
@@ -48,6 +53,11 @@ class CoalitionCombat(CoalitionUI, CampaignBase):
                 if click_timer.reached() and not click_last.reached():
                     self.device.click(BATTLE_STATUS)
                     click_timer.reset()
+
+    def auto_search_combat_end(self):
+        if self.appear(BATTLE_STATUS, offset=(80, 20)):
+            return True
+        return False
 
     def coalition_combat(self):
         """

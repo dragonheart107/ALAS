@@ -1,9 +1,7 @@
 from module.base.button import Button
 from module.base.decorator import run_once
 from module.base.timer import Timer
-from module.coalition.assets import NEONCITY_FLEET_PREPARATION, NEONCITY_PREPARATION_EXIT
 from module.combat.assets import GET_ITEMS_1, GET_ITEMS_2, GET_SHIP
-from module.event_hospital.assets import HOSIPITAL_CLUE_CHECK, HOSPITAL_BATTLE_EXIT
 from module.exception import (GameNotRunningError, GamePageUnknownError,
                               RequestHumanTakeover)
 from module.exercise.assets import EXERCISE_PREPARATION
@@ -13,13 +11,13 @@ from module.handler.assets import (AUTO_SEARCH_MENU_EXIT, BATTLE_PASS_NEW_SEASON
 from module.handler.info_handler import InfoHandler
 from module.logger import logger
 from module.map.assets import (FLEET_PREPARATION, MAP_PREPARATION,
-                               MAP_PREPARATION_CANCEL, WITHDRAW)
+                               MAP_PREPARATION_HARD, MAP_PREPARATION_CANCEL, WITHDRAW)
 from module.meowfficer.assets import MEOWFFICER_BUY
 from module.ocr.ocr import Ocr
 from module.os_handler.assets import (AUTO_SEARCH_REWARD, EXCHANGE_CHECK, RESET_FLEET_PREPARATION, RESET_TICKET_POPUP)
 from module.raid.assets import *
 from module.ui.assets import *
-from module.ui.page import Page, page_campaign, page_event, page_main, page_main_white, page_sp
+from module.ui.page import Page, page_academy, page_campaign, page_event, page_main, page_main_white, page_sp
 from module.ui_white.assets import *
 
 
@@ -39,6 +37,11 @@ class UI(InfoHandler):
             if self.appear(page_main.check_button, offset=(5, 5), interval=interval):
                 return True
             return False
+        # shitty EN localization changing font width of ACADEMY title,
+        # check other buttons also
+        if self.config.SERVER == 'en' and page == page_academy:
+            if self.appear(ACADEMY_GOTO_MUNITIONS, offset=offset, interval=interval):
+                return True
         return self.appear(page.check_button, offset=offset, interval=interval)
 
     def is_in_main(self, offset=(30, 30), interval=0):
@@ -236,6 +239,7 @@ class UI(InfoHandler):
         self.interval_clear(list(Page.iter_check_buttons()))
 
         logger.hr(f"UI goto {destination}")
+        island_page_detected = False
         while 1:
             GOTO_MAIN.clear_offset()
             if skip_first_screenshot:
@@ -246,6 +250,7 @@ class UI(InfoHandler):
             # Destination page
             if self.ui_page_appear(page=destination, offset=offset):
                 logger.info(f'Page arrive: {destination}')
+                self.ui_current = destination
                 break
 
             # Other pages
@@ -254,6 +259,8 @@ class UI(InfoHandler):
                 if page.parent is None or page.check_button is None:
                     continue
                 if self.appear(page.check_button, offset=offset, interval=5):
+                    self.ui_current = page
+                    island_page_detected = page.is_island() or page.parent.is_island()
                     logger.info(f'Page switch: {page} -> {page.parent}')
                     button = page.links[page.parent]
                     self.device.click(button)
@@ -264,7 +271,7 @@ class UI(InfoHandler):
                 continue
 
             # Additional
-            if self.ui_additional(get_ship=get_ship):
+            if self.ui_additional(get_ship=get_ship and not island_page_detected):
                 continue
 
         # Reset connection
@@ -377,7 +384,7 @@ class UI(InfoHandler):
         if self.appear_then_click(GET_ITEMS_2, offset=True, interval=3):
             return True
         if get_ship:
-            if self.appear_then_click(GET_SHIP, interval=5):
+            if self.appear_then_click(GET_SHIP, offset=(20, 20), interval=5):
                 return True
         if self.appear_then_click(LOGIN_RETURN_SIGN, offset=(30, 30), interval=3):
             return True
@@ -511,6 +518,7 @@ class UI(InfoHandler):
 
         # Campaign preparation
         if self.appear(MAP_PREPARATION, offset=(30, 30), interval=3) \
+                or self.appear(MAP_PREPARATION_HARD, offset=(30, 30), interval=3) \
                 or self.appear(FLEET_PREPARATION, offset=(20, 50), interval=3) \
                 or self.appear(RAID_FLEET_PREPARATION, offset=(30, 30), interval=3):
             self.device.click(MAP_PREPARATION_CANCEL)
@@ -559,10 +567,14 @@ class UI(InfoHandler):
         # if self.appear_then_click(HOSPITAL_BATTLE_EXIT, offset=(20, 20), interval=2):
         #     return True
         # Neon city (coalition_20250626)
-        if self.appear(NEONCITY_FLEET_PREPARATION, offset=(20, 20), interval=3):
-            logger.info(f'{NEONCITY_FLEET_PREPARATION} -> {NEONCITY_PREPARATION_EXIT}')
-            self.device.click(NEONCITY_PREPARATION_EXIT)
-            return True
+        # FASHION (coalition_20260122) reuse NEONCITY
+        # if self.appear(NEONCITY_FLEET_PREPARATION, offset=(20, 20), interval=3):
+        #     logger.info(f'{NEONCITY_FLEET_PREPARATION} -> {NEONCITY_PREPARATION_EXIT}')
+        #     self.device.click(NEONCITY_PREPARATION_EXIT)
+        #     return True
+        # DATE A LANE (coalition_20251120)
+        # if self.appear_then_click(DAL_DIFFICULTY_EXIT, offset=(20, 20), interval=3):
+        #     return True
 
         # Idle page
         if self.handle_idle_page():
@@ -610,6 +622,8 @@ class UI(InfoHandler):
         if button == MEOWFFICER_GOTO_DORMMENU:
             self.interval_reset(GET_SHIP)
         if button == DORMMENU_GOTO_DORM:
+            self.interval_reset(GET_SHIP)
+        if button == DORMMENU_GOTO_MEOWFFICER:
             self.interval_reset(GET_SHIP)
         for switch_button in page_main.links.values():
             if button == switch_button:

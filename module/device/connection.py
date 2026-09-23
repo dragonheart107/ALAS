@@ -19,9 +19,10 @@ from module.config.server import VALID_CHANNEL_PACKAGE, VALID_PACKAGE, set_serve
 from module.device.connection_attr import ConnectionAttr
 from module.device.env import IS_LINUX, IS_MACINTOSH, IS_WINDOWS
 from module.device.method.pool import WORKER_POOL
+from module.device.method.remove_warning import remove_shell_warning
 from module.device.method.utils import (PackageNotInstalled, RETRY_TRIES, get_serial_pair, handle_adb_error,
                                         handle_unknown_host_service, possible_reasons, random_port, recv_all,
-                                        remove_shell_warning, retry_sleep)
+                                        retry_sleep)
 from module.exception import EmulatorNotRunningError, RequestHumanTakeover
 from module.logger import logger
 from module.map.map_grids import SelectedGrids
@@ -318,7 +319,8 @@ class Connection(ConnectionAttr):
         # BlueStacks Air is the Mac version of BlueStacks
         if not IS_MACINTOSH:
             return False
-        if not self.is_ldplayer_bluestacks_family:
+        # 127.0.0.1:5555 + 10*n, assume 32 instances at max
+        if not (5555 <= self.port <= 5875):
             return False
         # [bst.installed_images]: [Tiramisu64]
         # [bst.instance]: [Tiramisu64]
@@ -335,10 +337,14 @@ class Connection(ConnectionAttr):
         # MuMU Pro is the Mac version of MuMu
         if not IS_MACINTOSH:
             return False
-        if not self.is_mumu_family:
-            return False
-        logger.attr('is_mumu_pro', True)
-        return True
+        if self.is_mumu_family:
+            logger.attr('is_mumu_pro', True)
+            return True
+        if self.serial.startswith('emulator-'):
+            if 'MACPRO' in self.nemud_player_engine.upper():
+                logger.attr('is_mumu_pro', True)
+                return True
+        return False
 
     @cached_property
     @retry
@@ -364,7 +370,7 @@ class Connection(ConnectionAttr):
         return res
 
     def check_mumu_app_keep_alive(self):
-        if not self.is_mumu_family:
+        if not (self.is_mumu_family or self.is_mumu_pro):
             return False
 
         res = self.nemud_app_keep_alive
@@ -399,15 +405,14 @@ class Connection(ConnectionAttr):
                 which has nemud.app_keep_alive and always be a vertical device
                 MuMu PRO on mac has the same feature
         """
+        if self.is_mumu_pro:
+            return True
         if not self.is_mumu_family:
             return False
         if self.is_mumu_over_version_400:
             return True
         if self.nemud_app_keep_alive != '':
             return True
-        if IS_MACINTOSH:
-            if 'MACPRO' in self.nemud_player_engine:
-                return True
         return False
 
     @cached_property
@@ -595,6 +600,22 @@ class Connection(ConnectionAttr):
             self.adb.forward(forward.local, forward.remote)
             return port
 
+    def _adb_reverse_transport(self, remote: str, local: str, norebind: bool = False):
+        """
+        Backport fixes from https://github.com/openatx/adbutils/pull/116
+        Don't use self.adb.reverse(), use this method.
+        """
+        args = ["reverse:forward"]
+        if norebind:
+            args.append("norebind")
+        args.append(remote + ";" + local)
+        cmd = ":".join(args)
+        with self.adb_client._connect() as c:
+            c.send_command(f'host:transport:{self.serial}')
+            c.check_okay()
+            c.send_command(cmd)
+            c.check_okay()
+
     def adb_reverse(self, remote):
         port = 0
         for reverse in self.adb.reverse_list():
@@ -604,16 +625,16 @@ class Connection(ConnectionAttr):
                     port = int(reverse.local[4:])
                 else:
                     logger.info(f'Remove redundant forward: {reverse}')
-                    self.adb_forward_remove(reverse.local)
+                    self.adb_reverse_remove(reverse.remote)
 
         if port:
             return port
         else:
             # Create new reverse
             port = random_port(self.config.FORWARD_PORT_RANGE)
-            reverse = ReverseItem(f'tcp:{port}', remote)
+            reverse = ReverseItem(remote, f'tcp:{port}')
             logger.info(f'Create reverse: {reverse}')
-            self.adb.reverse(reverse.local, reverse.remote)
+            self._adb_reverse_transport(reverse.remote, reverse.local)
             return port
 
     def adb_forward_remove(self, local):
