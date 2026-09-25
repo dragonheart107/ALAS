@@ -1,8 +1,8 @@
 import module.config.server as server
-
-from module.base.button import ButtonGrid, get_color, color_similar
+from module.base.button import ButtonGrid, color_similar, get_color
 from module.base.decorator import cached_property
 from module.base.timer import Timer
+from module.combat.assets import GET_ITEMS_1
 from module.equipment.equipment import Equipment
 from module.logger import logger
 from module.ocr.ocr import DigitCounter
@@ -80,8 +80,25 @@ class Dock(Equipment):
                 self.handle_dock_cards_loading()
 
     def dock_filter_enter(self):
-        self.ui_click(DOCK_FILTER, appear_button=DOCK_CHECK, check_button=DOCK_FILTER_CONFIRM,
-                      skip_first_screenshot=True)
+        logger.info('Dock filter enter')
+        self.interval_clear(DOCK_CHECK)
+        for _ in self.loop():
+            if self.appear(DOCK_FILTER_CONFIRM, offset=(20, 60)):
+                break
+            if self.appear(DOCK_CHECK, offset=(20, 20), interval=5):
+                self.device.click(DOCK_FILTER)
+                continue
+            # slow popups from last retirement
+            # Equip confirm
+            if self.appear_then_click(EQUIP_CONFIRM, offset=(30, 30), interval=2):
+                continue
+            if self.appear_then_click(EQUIP_CONFIRM_2, offset=(30, 30), interval=2):
+                self.interval_clear(GET_ITEMS_1)
+                continue
+            # Get items
+            if self.appear(GET_ITEMS_1, offset=(30, 30), interval=2):
+                self.device.click(GET_ITEMS_1_RETIREMENT_SAVE)
+                continue
 
     def dock_filter_confirm(self, wait_loading=True, skip_first_screenshot=True):
         """
@@ -98,10 +115,10 @@ class Dock(Equipment):
             # End
             # sometimes you have dock filter without black-blurred background
             # DOCK_FILTER_CONFIRM and DOCK_CHECK appears
-            if not self.appear(DOCK_FILTER_CONFIRM, offset=(20, 20)):
+            if not self.appear(DOCK_FILTER_CONFIRM, offset=(20, 60)):
                 if self.appear(DOCK_CHECK, offset=(20, 20)):
                     break
-            if self.appear_then_click(DOCK_FILTER_CONFIRM, offset=(20, 20), interval=3):
+            if self.appear_then_click(DOCK_FILTER_CONFIRM, offset=(20, 60), interval=3):
                 continue
 
         if wait_loading:
@@ -115,7 +132,7 @@ class Dock(Equipment):
         setting.add_setting(
             setting='sort',
             option_buttons=ButtonGrid(
-                origin=(218, 65), delta=delta, button_shape=button_shape, grid_shape=(7, 1), name='FILTER_SORT'),
+                origin=(218, 36), delta=delta, button_shape=button_shape, grid_shape=(7, 1), name='FILTER_SORT'),
             # stat has extra grid, not worth pursuing
             option_names=['rarity', 'level', 'total', 'join', 'intimacy', 'mood', 'stat'],
             option_default='level'
@@ -123,7 +140,7 @@ class Dock(Equipment):
         setting.add_setting(
             setting='index',
             option_buttons=ButtonGrid(
-                origin=(218, 138), delta=delta, button_shape=button_shape, grid_shape=(7, 2), name='FILTER_INDEX'),
+                origin=(218, 109), delta=delta, button_shape=button_shape, grid_shape=(7, 2), name='FILTER_INDEX'),
             option_names=['all', 'vanguard', 'main', 'dd', 'cl', 'ca', 'bb',
                           'cv', 'repair', 'ss', 'others', 'not_available', 'not_available', 'not_available'],
             option_default='all'
@@ -131,22 +148,23 @@ class Dock(Equipment):
         setting.add_setting(
             setting='faction',
             option_buttons=ButtonGrid(
-                origin=(218, 268), delta=delta, button_shape=button_shape, grid_shape=(7, 2), name='FILTER_FACTION'),
+                origin=(218, 239), delta=delta, button_shape=button_shape, grid_shape=(7, 3), name='FILTER_FACTION'),
             option_names=['all', 'eagle', 'royal', 'sakura', 'iron', 'dragon', 'sardegna',
-                          'northern', 'iris', 'vichya', 'tulipa', 'meta', 'tempesta', 'other'],
+                          'northern', 'iris', 'vichya', 'tulipa', 'pedreria', 'meta', 'tempesta',
+                          'other', 'not_available', 'not_available', 'not_available', 'not_available', 'not_available', 'not_available'],
             option_default='all'
         )
         setting.add_setting(
             setting='rarity',
             option_buttons=ButtonGrid(
-                origin=(218, 398), delta=delta, button_shape=button_shape, grid_shape=(7, 1), name='FILTER_RARITY'),
+                origin=(218, 427), delta=delta, button_shape=button_shape, grid_shape=(7, 1), name='FILTER_RARITY'),
             option_names=['all', 'common', 'rare', 'elite', 'super_rare', 'ultra', 'not_available'],
             option_default='all'
         )
         setting.add_setting(
             setting='extra',
             option_buttons=ButtonGrid(
-                origin=(218, 471), delta=delta, button_shape=button_shape, grid_shape=(7, 2), name='FILTER_EXTRA'),
+                origin=(218, 499), delta=delta, button_shape=button_shape, grid_shape=(7, 2), name='FILTER_EXTRA'),
             option_names=['no_limit', 'has_skin', 'can_retrofit', 'enhanceable', 'can_limit_break', 'not_level_max', 'can_awaken',
                           'can_awaken_plus', 'special', 'oath_skin', 'unique_augment_module', 'wear_skin', 'oathed', 'not_available'],
             option_default='no_limit'
@@ -173,12 +191,13 @@ class Dock(Equipment):
                  'cv', 'repair', 'ss', 'others', 'not_available', 'not_available', 'not_available']
             faction (str, list):
                 ['all', 'eagle', 'royal', 'sakura', 'iron', 'dragon', 'sardegna',
-                 'northern', 'iris', 'vichya', 'other', 'not_available', 'not_available', 'not_available']
+                 'northern', 'iris', 'vichya', 'tulipa', 'pedreria', 'meta', 'tempesta',
+                 'other', 'not_available', 'not_available', 'not_available', 'not_available', 'not_available', 'not_available']
             rarity (str, list):
                 ['all', 'common', 'rare', 'elite', 'super_rare', 'ultra', 'not_available']
             extra (str, list):
                 ['no_limit', 'has_skin', 'can_retrofit', 'enhanceable', 'can_limit_break', 'not_level_max', 'can_awaken',
-                 'can_awaken_plus', 'special', 'oath_skin', 'unique_augment_module', 'not_available', 'not_available', 'not_available'],
+                 'can_awaken_plus', 'special', 'oath_skin', 'unique_augment_module', 'wear_skin', 'oathed', 'not_available'],
 
         Pages:
             in: page_dock
@@ -187,42 +206,33 @@ class Dock(Equipment):
         self.dock_filter.set(sort=sort, index=index, faction=faction, rarity=rarity, extra=extra)
         self.dock_filter_confirm(wait_loading=wait_loading)
 
-    def dock_select_one(self, button, skip_first_screenshot=True):
+    def dock_reset(self):
+        self.dock_favourite_set(False, wait_loading=False)
+        self.dock_sort_method_dsc_set(False, wait_loading=False)
+        self.dock_filter_set()
+
+    def dock_select_one(self, button):
         """
         Args:
             button (Button): Ship button to select
             skip_first_screenshot:
         """
-        # if self.config.SERVER == 'en':
-        #     logger.info('EN has no dock_selected check currently, use plain click')
-        #
-        #     self.device.click(button)
-        #
-        #     while 1:
-        #         self.device.screenshot()
-        #
-        #         if self.appear(DOCK_CHECK, offset=(20, 20)):
-        #             break
-        #         if self.handle_popup_confirm('DOCK_SELECT'):
-        #             continue
-        #     return
-
-        while 1:
-            if skip_first_screenshot:
-                skip_first_screenshot = False
-            else:
-                self.device.screenshot()
-
+        self.interval_clear(DOCK_CHECK)
+        click_interval = Timer(3, count=6)
+        for _ in self.loop():
             if self.dock_selected():
                 break
 
-            if self.appear(DOCK_CHECK, offset=(20, 20), interval=5):
-                self.device.click(button)
-                continue
+            # unwrapped self.appear(interval=3) with Timer.count
+            if click_interval.reached():
+                if self.appear(DOCK_CHECK, offset=(20, 20)):
+                    self.device.click(button)
+                    click_interval.reset()
+                    continue
             if self.handle_popup_confirm('DOCK_SELECT'):
                 continue
 
-    def dock_selected(self, skip_first_screenshot=True):
+    def dock_selected(self):
         """
         Args:
             skip_first_screenshot:
@@ -237,12 +247,7 @@ class Dock(Equipment):
 
         current = 0
         timeout = Timer(1.5, count=3).start()
-        while 1:
-            if skip_first_screenshot:
-                skip_first_screenshot = False
-            else:
-                self.device.screenshot()
-
+        for _ in self.loop():
             if timeout.reached():
                 logger.warning('Get dock_selected timeout, assume not selected')
                 break

@@ -67,7 +67,8 @@ class Combat(Level, HPBalancer, Retirement, SubmarineCall, CombatAuto, CombatMan
         Returns:
             bool:
         """
-        image = self.image_crop((0, 620, 1280, 720), copy=False)
+        image = self.image_crop((0, 620, 1280, 690), copy=False)
+        # note that CN/EN/TW are the same, but JP character is smaller
         similarity, button = TEMPLATE_COMBAT_LOADING.match_luma_result(image)
         if similarity > 0.85:
             loading = (button.area[0] + 38 - LOADING_BAR.area[0]) / (LOADING_BAR.area[2] - LOADING_BAR.area[0])
@@ -106,11 +107,39 @@ class Combat(Level, HPBalancer, Retirement, SubmarineCall, CombatAuto, CombatMan
         # PAUSE_Pharaoh has random animation, assets should avoid the area in the middle and use match_luma
         if PAUSE_Pharaoh.match_luma(self.device.image, offset=(10, 10)):
             return PAUSE_Pharaoh
+        # PAUSE_Star may get detected as PAUSE_Nurse, should before it
+        if PAUSE_Star.match_luma(self.device.image, offset=(10, 10)):
+            return PAUSE_Star
         if PAUSE_Nurse.match_luma(self.device.image, offset=(10, 10)):
             return PAUSE_Nurse
         # PAUSE_Devil is in red
         if PAUSE_Devil.match_template_color(self.device.image, offset=(10, 10)):
             return PAUSE_Devil
+        # PAUSE_Seaside is in light blue
+        if PAUSE_Seaside.match_template_color(self.device.image, offset=(10, 10)):
+            return PAUSE_Seaside
+        if PAUSE_Ninja.match_template_color(self.device.image, offset=(10, 10)):
+            return PAUSE_Ninja
+        if PAUSE_ShadowPuppetry.match_luma(self.device.image, offset=(10, 10)):
+            return PAUSE_ShadowPuppetry
+        if PAUSE_MaidCafe.match_template_color(self.device.image, offset=(10, 10)):
+            return PAUSE_MaidCafe
+        if PAUSE_Ancient.match_template_color(self.device.image, offset=(10, 10)):
+            return PAUSE_Ancient
+        if PAUSE_SpringInn.match_template_color(self.device.image, offset=(10, 10)):
+            return PAUSE_SpringInn
+        if PAUSE_ElvenVine.match_template_color(self.device.image, offset=(10, 10)):
+            return PAUSE_ElvenVine
+        if PAUSE_GildedReverie.match_template_color(self.device.image, offset=(10, 10)):
+            return PAUSE_GildedReverie
+        if PAUSE_AzureCore.match_template_color(self.device.image, offset=(10, 10)):
+            return PAUSE_AzureCore
+        if PAUSE_OldeRoyal.match_template_color(self.device.image, offset=(10, 10)):
+            return PAUSE_OldeRoyal
+        if PAUSE_YoRHa.match_template_color(self.device.image, offset=(10, 10)):
+            return PAUSE_YoRHa
+        if PAUSE_Ritual.match_template_color(self.device.image, offset=(10, 10)):
+            return PAUSE_Ritual
         return False
 
     def handle_combat_quit(self, offset=(20, 20), interval=3):
@@ -131,6 +160,11 @@ class Combat(Level, HPBalancer, Retirement, SubmarineCall, CombatAuto, CombatMan
             return True
         # Battle UI PAUSE_Neon uses QUIT_New
         # Battle UI PAUSE_Cyber uses QUIT_New
+        # [TW] QUIT_New is in bold and PAUSE_Cyber is regular weight
+        if QUIT_Cyber.match_luma(self.device.image, offset=offset):
+            self.device.click(QUIT_Cyber)
+            timer.reset()
+            return True
         if QUIT_Christmas.match_luma(self.device.image, offset=offset):
             self.device.click(QUIT_Christmas)
             timer.reset()
@@ -145,6 +179,43 @@ class Combat(Level, HPBalancer, Retirement, SubmarineCall, CombatAuto, CombatMan
             timer.reset()
             return True
         # Battle UI PAUSE_Devil uses QUIT_New
+        if QUIT_Seaside.match_luma(self.device.image, offset=offset):
+            self.device.click(QUIT_Seaside)
+            timer.reset()
+            return True
+        if QUIT_Ninja.match_luma(self.device.image, offset=offset):
+            self.device.click(QUIT_Ninja)
+            timer.reset()
+            return True
+        if QUIT_MaidCafe.match_luma(self.device.image, offset=offset):
+            self.device.click(QUIT_MaidCafe)
+            timer.reset()
+            return True
+        if QUIT_SpringInn.match_luma(self.device.image, offset=offset):
+            self.device.click(QUIT_SpringInn)
+            timer.reset()
+            return True
+        if QUIT_GildedReverie.match_luma(self.device.image, offset=offset):
+            self.device.click(QUIT_GildedReverie)
+            timer.reset()
+            return True
+        if QUIT_YoRHa.match_luma(self.device.image, offset=offset):
+            self.device.click(QUIT_YoRHa)
+            timer.reset()
+            return True
+        if QUIT_Ritual.match_luma(self.device.image, offset=offset):
+            self.device.click(QUIT_Ritual)
+            timer.reset()
+            return True
+        return False
+
+    def handle_combat_quit_reconfirm(self, interval=2):
+        # QUIT_RECONFIRM interval should shorter than QUIT,
+        # so multiple retries can be made during the interval of QUIT
+        if self.appear_then_click(QUIT_RECONFIRM, offset=(20, 20), interval=interval):
+            # reset QUIT timer to avoid duplicate QUIT clicks canceling QUIT_RECONFIRM
+            self.interval_reset(QUIT)
+            return True
         return False
 
     def ensure_combat_oil_loaded(self):
@@ -176,11 +247,7 @@ class Combat(Level, HPBalancer, Retirement, SubmarineCall, CombatAuto, CombatMan
         if balance_hp:
             self.hp_balance()
 
-        while 1:
-            if skip_first_screenshot:
-                skip_first_screenshot = False
-            else:
-                self.device.screenshot()
+        for _ in self.loop():
 
             if self.appear(BATTLE_PREPARATION, offset=(20, 20)):
                 if self.handle_combat_automation_set(auto=auto == 'combat_auto'):
@@ -197,6 +264,7 @@ class Combat(Level, HPBalancer, Retirement, SubmarineCall, CombatAuto, CombatMan
                 continue
             if self.handle_story_skip():
                 continue
+            # slow down the screenshot interval earlier
             if not interval_set:
                 if self.is_combat_loading():
                     self.device.screenshot_interval_set('combat')
@@ -208,6 +276,9 @@ class Combat(Level, HPBalancer, Retirement, SubmarineCall, CombatAuto, CombatMan
                 logger.attr('BattleUI', pause)
                 if emotion_reduce:
                     self.emotion.reduce(fleet_index)
+                # fallback slow down if is_combat_loading() not detected
+                if not interval_set:
+                    self.device.screenshot_interval_set('combat')
                 break
 
     def handle_battle_preparation(self):
@@ -307,8 +378,7 @@ class Combat(Level, HPBalancer, Retirement, SubmarineCall, CombatAuto, CombatMan
         confirm_timer = Timer(10)
         confirm_timer.start()
 
-        while 1:
-            self.device.screenshot()
+        for _ in self.loop():
 
             if not confirm_timer.reached():
                 if self.handle_combat_automation_confirm():
@@ -458,7 +528,7 @@ class Combat(Level, HPBalancer, Retirement, SubmarineCall, CombatAuto, CombatMan
         Returns:
             bool:
         """
-        if self.appear_then_click(GET_SHIP, interval=1):
+        if self.appear_then_click(GET_SHIP, offset=(20, 20), interval=1):
             if self.appear(NEW_SHIP):
                 logger.info('Get a new SHIP')
                 if drop:
@@ -497,8 +567,7 @@ class Combat(Level, HPBalancer, Retirement, SubmarineCall, CombatAuto, CombatMan
         self.device.click_record_clear()
         battle_status = False
         exp_info = False  # This is for the white screen bug in game
-        while 1:
-            self.device.screenshot()
+        for _ in self.loop():
 
             # Expected end
             if isinstance(expected_end, str):

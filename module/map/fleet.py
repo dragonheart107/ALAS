@@ -102,7 +102,7 @@ class Fleet(Camera, AmbushHandler):
             self.show_fleet()
             self.hp_get()
             self.lv_get()
-            self.handle_strategy(index=self.fleet_current_index)
+            self.handle_strategy(index=self.fleet_show_index)
             return True
         else:
             return False
@@ -630,10 +630,12 @@ class Fleet(Camera, AmbushHandler):
         logger.info(f'Tracked enemy {matched_before} -> {matched_after}')
 
         # Delete wrong prediction
-        for grid in after.delete(matched_after):
-            if not grid.may_siren:
-                logger.warning(f'Wrong detection: {grid}')
-                grid.wipe_out()
+        # keep whatever if MAP_HAS_MOVABLE_NORMAL_ENEMY, it's kind of a mess
+        if not self.config.MAP_HAS_MOVABLE_NORMAL_ENEMY:
+            for grid in after.delete(matched_after):
+                if not grid.may_siren:
+                    logger.warning(f'Wrong detection: {grid}')
+                    grid.wipe_out()
 
         # Predict missing siren
         diff = before.delete(matched_before)
@@ -649,6 +651,13 @@ class Fleet(Camera, AmbushHandler):
                 covered = covered.add(self.map.grid_covered(self.map[self.fleet_1_location], location=[(0, -1)]))
             if self.fleet_2_location:
                 covered = covered.add(self.map.grid_covered(self.map[self.fleet_2_location], location=[(0, -1)]))
+            if self.config.MAP_HAS_MOVABLE_NORMAL_ENEMY and not self.config.MAP_ENEMY_TEMPLATE:
+                # enemy_scale icon of the right grid may get covered by fleet
+                # if enemy template is empty, must predict by enemy_scale
+                if self.fleet_1_location:
+                    covered = covered.add(self.map.grid_covered(self.map[self.fleet_1_location], location=[(1, 0)]))
+                if self.fleet_2_location:
+                    covered = covered.add(self.map.grid_covered(self.map[self.fleet_2_location], location=[(1, 0)]))
             covered = covered.add(self.map._map_covered)
             if siren:
                 for grid in after:
@@ -879,8 +888,15 @@ class Fleet(Camera, AmbushHandler):
         Such as select strategy, calculate hp and level, init camera position, do first map scan.
         """
         self.update()
-        if not self.handle_fleet_reverse():
-            self.fleet_set(index=1)
+        switched = self.handle_fleet_reverse()
+        if not switched:
+            switched = self.fleet_set(index=1)
+        # infobar might cover bottom edge, causing retries in ensure_edge_insight
+        # if map surface is dark and fleet spawn point is near bottom edge,
+        # MAP_FLEET_REVERSE_WAIT_INFO_BAR to prevent that happens
+        if switched and self.config.MAP_FLEET_REVERSE_WAIT_INFO_BAR:
+            # info bar might not appear immediately, use ensure_no_info_bar to wait until appear with timeout
+            self.ensure_no_info_bar()
         self.handle_strategy(index=self.fleet_show_index)
         self.hp_reset()
         self.hp_get()
@@ -888,7 +904,7 @@ class Fleet(Camera, AmbushHandler):
         self.lv_get()
         self.ensure_edge_insight(preset=self.map.in_map_swipe_preset_data)
         self.handle_info_bar()  # The info_bar which shows "Changed to fleet 2", will block the ammo icon
-        self.full_scan(must_scan=self.map.camera_data_spawn_point)
+        self.full_scan(must_scan=self.map.camera_data_spawn_point, mode='init')
         self.find_current_fleet()
         self.find_submarine()
         self.find_path_initial()

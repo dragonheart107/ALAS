@@ -1,4 +1,5 @@
 import ipaddress
+import json
 import logging
 import re
 import socket
@@ -13,12 +14,15 @@ from adbutils.errors import AdbError
 from module.base.decorator import Config, cached_property, del_cached_property, run_once
 from module.base.timer import Timer
 from module.base.utils import ensure_time
+from module.config.deep import deep_get
 from module.config.server import VALID_CHANNEL_PACKAGE, VALID_PACKAGE, set_server
 from module.device.connection_attr import ConnectionAttr
 from module.device.env import IS_LINUX, IS_MACINTOSH, IS_WINDOWS
+from module.device.method.pool import WORKER_POOL
+from module.device.method.remove_warning import remove_shell_warning
 from module.device.method.utils import (PackageNotInstalled, RETRY_TRIES, get_serial_pair, handle_adb_error,
                                         handle_unknown_host_service, possible_reasons, random_port, recv_all,
-                                        remove_shell_warning, retry_sleep)
+                                        retry_sleep)
 from module.exception import EmulatorNotRunningError, RequestHumanTakeover
 from module.logger import logger
 from module.map.map_grids import SelectedGrids
@@ -315,7 +319,8 @@ class Connection(ConnectionAttr):
         # BlueStacks Air is the Mac version of BlueStacks
         if not IS_MACINTOSH:
             return False
-        if not self.is_ldplayer_bluestacks_family:
+        # 127.0.0.1:5555 + 10*n, assume 32 instances at max
+        if not (5555 <= self.port <= 5875):
             return False
         # [bst.installed_images]: [Tiramisu64]
         # [bst.instance]: [Tiramisu64]
@@ -332,10 +337,14 @@ class Connection(ConnectionAttr):
         # MuMU Pro is the Mac version of MuMu
         if not IS_MACINTOSH:
             return False
-        if not self.is_mumu_family:
-            return False
-        logger.attr('is_mumu_pro', True)
-        return True
+        if self.is_mumu_family:
+            logger.attr('is_mumu_pro', True)
+            return True
+        if self.serial.startswith('emulator-'):
+            if 'MACPRO' in self.nemud_player_engine.upper():
+                logger.attr('is_mumu_pro', True)
+                return True
+        return False
 
     @cached_property
     @retry
@@ -361,7 +370,7 @@ class Connection(ConnectionAttr):
         return res
 
     def check_mumu_app_keep_alive(self):
-        if not self.is_mumu_family:
+        if not (self.is_mumu_family or self.is_mumu_pro):
             return False
 
         res = self.nemud_app_keep_alive
@@ -396,15 +405,14 @@ class Connection(ConnectionAttr):
                 which has nemud.app_keep_alive and always be a vertical device
                 MuMu PRO on mac has the same feature
         """
+        if self.is_mumu_pro:
+            return True
         if not self.is_mumu_family:
             return False
         if self.is_mumu_over_version_400:
             return True
         if self.nemud_app_keep_alive != '':
             return True
-        if IS_MACINTOSH:
-            if 'MACPRO' in self.nemud_player_engine:
-                return True
         return False
 
     @cached_property
@@ -592,6 +600,22 @@ class Connection(ConnectionAttr):
             self.adb.forward(forward.local, forward.remote)
             return port
 
+    def _adb_reverse_transport(self, remote: str, local: str, norebind: bool = False):
+        """
+        Backport fixes from https://github.com/openatx/adbutils/pull/116
+        Don't use self.adb.reverse(), use this method.
+        """
+        args = ["reverse:forward"]
+        if norebind:
+            args.append("norebind")
+        args.append(remote + ";" + local)
+        cmd = ":".join(args)
+        with self.adb_client._connect() as c:
+            c.send_command(f'host:transport:{self.serial}')
+            c.check_okay()
+            c.send_command(cmd)
+            c.check_okay()
+
     def adb_reverse(self, remote):
         port = 0
         for reverse in self.adb.reverse_list():
@@ -601,16 +625,16 @@ class Connection(ConnectionAttr):
                     port = int(reverse.local[4:])
                 else:
                     logger.info(f'Remove redundant forward: {reverse}')
-                    self.adb_forward_remove(reverse.local)
+                    self.adb_reverse_remove(reverse.remote)
 
         if port:
             return port
         else:
             # Create new reverse
             port = random_port(self.config.FORWARD_PORT_RANGE)
-            reverse = ReverseItem(f'tcp:{port}', remote)
+            reverse = ReverseItem(remote, f'tcp:{port}')
             logger.info(f'Create reverse: {reverse}')
-            self.adb.reverse(reverse.local, reverse.remote)
+            self._adb_reverse_transport(reverse.remote, reverse.local)
             return port
 
     def adb_forward_remove(self, local):
@@ -780,6 +804,7 @@ class Connection(ConnectionAttr):
                     self.detect_device()
                     if self.serial != before:
                         return True
+                run_once(self.check_mumu_bridge_network)()
                 # No such device
                 logger.warning('No such device exists, please restart the emulator or set a correct serial')
                 raise EmulatorNotRunningError
@@ -794,26 +819,49 @@ class Connection(ConnectionAttr):
         Args:
             serial_list (list[str]):
         """
-        import asyncio
-        from concurrent.futures import ThreadPoolExecutor
-        ev = asyncio.new_event_loop()
-        pool = ThreadPoolExecutor(
-            max_workers=len(serial_list),
-            thread_name_prefix='adb_brute_force_connect',
-        )
-
-        def _connect(serial):
-            msg = self.adb_client.connect(serial)
+        def connect(s):
+            try:
+                msg = self.adb_client.connect(s)
+            except Exception:
+                return ''
             logger.info(msg)
             return msg
 
-        async def connect():
-            tasks = [ev.run_in_executor(pool, _connect, serial) for serial in serial_list]
-            await asyncio.gather(*tasks)
+        with WORKER_POOL.wait_jobs() as pool:
+            for serial in serial_list:
+                pool.start_thread_soon(connect, serial)
 
-        ev.run_until_complete(connect())
-        pool.shutdown(wait=False)
-        ev.close()
+    def check_mumu_bridge_network(self):
+        """
+        Returns:
+            bool: True if success to check, False if check is skipped
+        """
+        if not self.is_mumu12_family:
+            return True
+        if not hasattr(self, 'find_emulator_instance'):
+            return False
+        # Assume PlatformBase inherited this class
+        instance = self.find_emulator_instance(
+            serial=self.serial,
+        )
+        if instance is None:
+            logger.warning(f'Failed to check check_mumu_bridge_network, emulator instance not found')
+            return False
+        file = instance.mumu_vms_config('customer_config.json')
+        try:
+            with open(file, mode='r', encoding='utf-8') as f:
+                s = f.read()
+                data = json.loads(s)
+        except FileNotFoundError:
+            logger.warning(f'Failed to check check_mumu_bridge_network, file {file} not exists')
+            return False
+        value = deep_get(data, keys='customer.network_bridge_opened', default=None)
+        logger.attr('customer.network_bridge_opened', value)
+        if str(value).lower() == 'true':
+            logger.critical('Please turn off "Network Bridging" in the settings of MuMuPlayer')
+            logger.critical('请在MuMU模拟器设置中关闭 网络桥接')
+            raise RequestHumanTakeover
+        return True
 
     @Config.when(DEVICE_OVER_HTTP=True)
     def adb_connect(self, wait_device=True):

@@ -35,10 +35,6 @@ class Retirement(Enhancement, QuickRetireSettingHandler):
     # From MapOperation
     map_cat_attack_timer = Timer(2)
 
-    @property
-    def retire_keep_common_cv(self):
-        return self.config.is_task_enabled('GemsFarming')
-
     def _retirement_choose(self, amount=10, target_rarity=('N',)):
         """
         Args:
@@ -119,14 +115,20 @@ class Retirement(Enhancement, QuickRetireSettingHandler):
                     or self.config.OldRetire_SSR \
                     or self.config.Retirement_RetireMode == 'one_click_retire':
                 if self.handle_popup_confirm(name='RETIRE_SR_SSR', offset=(20, 50)):
+                    # Avoid clicking the undelying SHIP_CONFIRM again
                     self.interval_reset([SHIP_CONFIRM, SHIP_CONFIRM_2])
+                    # EQUIP_CONFIRM_2 may be detected as popup confirm
+                    self.interval_reset([EQUIP_CONFIRM, EQUIP_CONFIRM_2])
                     continue
                 if self.config.SERVER in ['cn', 'jp', 'tw'] and \
                         self.appear_then_click(SR_SSR_CONFIRM, offset=(20, 50), interval=2):
+                    # Avoid clicking the undelying SHIP_CONFIRM again
                     self.interval_reset([SHIP_CONFIRM, SHIP_CONFIRM_2])
+                    # EQUIP_CONFIRM_2 may be detected as popup confirm
+                    self.interval_reset([EQUIP_CONFIRM, EQUIP_CONFIRM_2])
                     continue
             if self.match_template_color(SHIP_CONFIRM_2, offset=(30, 30), interval=2):
-                if self.retire_keep_common_cv and not self._have_kept_cv:
+                if self._retire_keep_common_cv and not self._have_kept_cv:
                     self.keep_one_common_cv()
                 self.device.click(SHIP_CONFIRM_2)
                 # GET_ITEMS_1 is going to appear, avoid re-entering ship confirm
@@ -138,15 +140,17 @@ class Retirement(Enhancement, QuickRetireSettingHandler):
                 continue
             # Equip confirm
             if self.appear_then_click(EQUIP_CONFIRM, offset=(30, 30), interval=2):
-                executed = True
                 continue
             if self.appear_then_click(EQUIP_CONFIRM_2, offset=(30, 30), interval=2):
                 self.interval_clear(GET_ITEMS_1)
+                executed = True
                 continue
             # Get items
             if self.appear(GET_ITEMS_1, offset=(30, 30), interval=2):
                 self.device.click(GET_ITEMS_1_RETIREMENT_SAVE)
                 self.interval_reset(SHIP_CONFIRM)
+                # equipment confirms are the next to appear
+                self.interval_clear([EQUIP_CONFIRM, EQUIP_CONFIRM_2])
                 continue
 
     def retirement_appear(self):
@@ -204,7 +208,7 @@ class Retirement(Enhancement, QuickRetireSettingHandler):
         end = False
         total = 0
 
-        if self.retire_keep_common_cv:
+        if self._retire_keep_common_cv:
             self._have_kept_cv = False
 
         while 1:
@@ -288,7 +292,7 @@ class Retirement(Enhancement, QuickRetireSettingHandler):
 
         total = 0
 
-        if self.retire_keep_common_cv:
+        if self._retire_keep_common_cv:
             self._have_kept_cv = False
 
         while amount:
@@ -383,6 +387,9 @@ class Retirement(Enhancement, QuickRetireSettingHandler):
         Returns:
             bool: If retired.
         """
+        # 2025.05.29 game tips that infos skin feature when you enter dock
+        if self.handle_game_tips():
+            return True
         if self._unable_to_enhance:
             if self.appear_then_click(RETIRE_APPEAR_1, offset=(20, 20), interval=3):
                 self.interval_clear(IN_RETIREMENT_CHECK)
@@ -525,30 +532,28 @@ class Retirement(Enhancement, QuickRetireSettingHandler):
         Returns:
             Button:
         """
-        if self.config.GemsFarming_CommonCV == 'any':
-            for common_cv_name in ['BOGUE', 'HERMES', 'LANGLEY', 'RANGER']:
-                template = globals()[f'TEMPLATE_{common_cv_name}']
-                sim, button = template.match_result(
-                    resize(self.device.image, size=(1189, 669)))
-
-                if sim > self.config.COMMON_CV_THRESHOLD:
-                    return Button(button=tuple(_ * 155 // 144 for _ in button.button), area=button.area,
-                                  color=button.color,
-                                  name=f'TEMPLATE_{common_cv_name}_RETIRE')
-
+        cv = self._retire_keep_common_cv
+        if not cv:
             return None
-        else:
 
-            template = globals()[
-                f'TEMPLATE_{self.config.GemsFarming_CommonCV.upper()}']
-            sim, button = template.match_result(
-                resize(self.device.image, size=(1189, 669)))
+        dict_template = {
+            'bogue': TEMPLATE_BOGUE,
+            'hermes': TEMPLATE_HERMES,
+            'langley': TEMPLATE_LANGLEY,
+            'ranger': TEMPLATE_RANGER,
+        }
+        if cv != 'any':
+            dict_template = {cv: dict_template[cv]}
 
+        target = resize(self.device.image, size=(1189, 669))
+        for cv, template in dict_template.items():
+            sim, button = template.match_result(target)
             if sim > self.config.COMMON_CV_THRESHOLD:
-                return Button(button=tuple(_ * 155 // 144 for _ in button.button), area=button.area, color=button.color,
-                              name=f'TEMPLATE_{self.config.GemsFarming_CommonCV.upper()}_RETIRE')
+                return Button(button=tuple(_ * 155 // 144 for _ in button.button), area=button.area,
+                              color=button.color,
+                              name=f'TEMPLATE_{cv.upper()}_RETIRE')
 
-            return None
+        return None
 
     def retirement_get_common_rarity_cv(self, skip_first_screenshot=False):
         """

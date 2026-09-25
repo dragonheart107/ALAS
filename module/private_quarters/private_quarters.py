@@ -1,87 +1,38 @@
 import module.config.server as server
 from module.base.timer import Timer
-from module.handler.assets import POPUP_CANCEL
 from module.logger import logger
-from module.ocr.ocr import Digit, DigitCounter
 from module.private_quarters.assets import *
-from module.ui.page import page_private_quarters
-from module.ui.ui import UI
+from module.private_quarters.interact import PQInteract
+from module.private_quarters.shop import PQShop
+from module.ui.page import page_private_quarters, page_dormmenu
 
-OCR_DAILY_COUNT = DigitCounter(PRIVATE_QUARTERS_DAILY_COUNT, letter=(255, 247, 247), threshold=64)
-if server.server != 'jp':
-    OCR_SHOP_GOLD_COINS = Digit(PRIVATE_QUARTERS_SHOP_GOLD_COINS, letter=(239, 239, 239), name='OCR_SHOP_GOLD_COINS')
-else:
-    OCR_SHOP_GOLD_COINS = Digit(PRIVATE_QUARTERS_SHOP_GOLD_COINS, letter=(201, 201, 201), name='OCR_SHOP_GOLD_COINS')
 
-class PrivateQuarters(UI):
-    # Key: str, target ship name
-    # Value: Button, button instance
-    available_targets = {
-        'anchorage': PRIVATE_QUARTERS_SHIP_ANCHORAGE,
-        'noshiro': PRIVATE_QUARTERS_SHIP_NOSHIRO,
-        'sirius': PRIVATE_QUARTERS_SHIP_SIRIUS,
+class PrivateQuarters(PQInteract, PQShop):
+    # Key: str, server name
+    # Value: list[str]
+    not_supported_filter = {
+        'cn': (),
+        'en': (),
+        'jp': ('nakhimov'),
+        'tw': ('taihou', 'nakhimov'),
     }
 
-    def _pq_target_appear(self):
+    def _pq_get_daily_count(self, retry=3):
         """
-        Callable wrapper to validate target's appearance
-        offset=(100, 100) detectable for anchorage, noshiro, and sirus
-        When more ships added may need to adjust or capture specific bubble position per
-        ship, can use the available_targets to store similarly into tuples instead
-        """
-        settle_timer = Timer(1.5, count=3).start()
-        skip_first_screenshot = True
-        while 1:
-            if skip_first_screenshot:
-                skip_first_screenshot = False
-            else:
-                self.device.screenshot()
-
-            # End, success
-            if self.appear(PRIVATE_QUARTERS_ROOM_TARGET_CHECK, offset=(100, 100)):
-                return True
-
-            # End, failed expired wait time
-            if settle_timer.reached():
-                return False
-
-    def _pq_goto_room_check(self):
-        """
-        Callable wrapper for whether is loading or blocked by download asset popup
-        """
-        return self.appear(PRIVATE_QUARTERS_LOADING_CHECK, offset=(20,20)) or self.appear(POPUP_CANCEL, offset=(20, 20))
-
-    def _pq_goto_room_enter(self, target_ship):
-        """
-        Execute enter room routine
+        Wrapper func for status_get_daily_count
+        For fast PCs, initial screenshot
+        may be foggy or lagging behind
+        So add limited buffer check to retry
+        before giving up
 
         Args:
-            target_ship (str):
+            retry (int):
 
         Returns:
-            bool
+            int
         """
-        # Initiate goto into target's room
-        # Ensure either loading or popup
-        # prompt appears after click
-        target_title = target_ship.title()
-        target_btn = self.available_targets[target_ship]
-        self.ui_click(
-            click_button=target_btn,
-            check_button=self._pq_goto_room_check,
-            appear_button=page_private_quarters.check_button,
-            offset=(20, 20),
-            skip_first_screenshot=True)
-
-        # If was download asset popup
-        # Terminate the run
-        if self.handle_popup_cancel('PRIVATE_QUARTERS_DOWNLOAD_ASSET', offset=(20, 20)):
-            logger.error(f'Cannot enter {target_title}\'s room, please download the necessary assets first')
-            return False
-
-        # Fully enter into target's room
-        # through click progression
-        click_timer = Timer(1.5, count=3).start()
+        count = self.status_get_daily_count()
+        get_timer = Timer(1.5, count=3).start()
         skip_first_screenshot = True
         while 1:
             if skip_first_screenshot:
@@ -90,54 +41,21 @@ class PrivateQuarters(UI):
                 self.device.screenshot()
 
             # End
-            if self.appear(PRIVATE_QUARTERS_ROOM_CHECK, offset=(20, 20)):
-                break
+            # - success, non-zero daily count
+            # - exhausted all retries, so
+            #   MUST BE zero
+            if count != 0 or retry == 0:
+                return count
 
-            # Continue without clicking, mitigate too many click exception
-            if self.appear(PRIVATE_QUARTERS_LOADING_CHECK, offset=(20, 20)):
-                continue
+            # Timer expired, recapture daily count now
+            if get_timer.reached():
+                count = self.status_get_daily_count()
+                get_timer.reset()
+                retry -= 1
 
-            if click_timer.reached():
-                self.device.click(PRIVATE_QUARTERS_ROOM_SAFE_CLICK_AREA)
-                click_timer.reset()
-
-        # If target's intimacy is maxed
-        # Terminate the run
-        if self.appear(PRIVATE_QUARTERS_ROOM_TARGET_INTIMACY_MAX, offset=(20, 20)):
-            logger.warn(f'{target_title}\'s intimacy is maxed, configure to new target or turn off subtask altogether')
-            return False
-
-        return True
-
-    def _pq_goto_room_exit(self):
+    def _pq_shop_enter(self):
         """
-        Execute room exit routine
-        """
-        self.interval_clear(PRIVATE_QUARTERS_ROOM_BACK)
-        self.ui_click(
-            click_button=PRIVATE_QUARTERS_ROOM_BACK,
-            check_button=page_private_quarters.check_button,
-            offset=(20, 20),
-            retry_wait=1.5,
-            skip_first_screenshot=True
-        )
-        self.handle_info_bar()
-
-    def _pq_shop_exit(self):
-        """
-        Execute shop exit routine
-        """
-        self.ui_click(
-            click_button=PRIVATE_QUARTERS_SHOP_BACK,
-            check_button=page_private_quarters.check_button,
-            offset=(20, 20),
-            skip_first_screenshot=True
-        )
-
-    def pq_shop_weekly_roses(self):
-        """
-        Execute purchase weekly roses from shop routine
-        Must have 24K+, try next day if low
+        Execute shop enter routine
         """
         # Enter shop
         self.ui_click(
@@ -148,116 +66,66 @@ class PrivateQuarters(UI):
             skip_first_screenshot=True
         )
 
-        # Roses available for purchase?
-        # Exit shop if not
-        # Noticeable lag observed on appearance of roses
-        appear_timer = Timer(1.5, count=3).start()
-        skip_first_screenshot = True
-        while 1:
-            if skip_first_screenshot:
-                skip_first_screenshot = False
-            else:
-                self.device.screenshot()
+        # Transition to Sirius section
+        self.shop_left_navbar_ensure(2)
 
-            # End, no roses
-            if appear_timer.reached():
-                logger.info('No more weekly roses to purchase, exit subtask')
-                self._pq_shop_exit()
-                return
+        # Transition to Gift section
+        self.shop_bottom_navbar_ensure(2)
 
-            # End, has roses
-            if self.appear(PRIVATE_QUARTERS_SHOP_WEEKLY_ROSES_CHECK, offset=(20, 20)):
-                break
+    def _pq_shop_exit(self):
+        """
+        Execute shop exit routine
+        """
+        self.ui_click(
+            click_button=PRIVATE_QUARTERS_SHOP_BACK,
+            check_button=page_private_quarters.check_button,
+            appear_button=PRIVATE_QUARTERS_SHOP_CHECK,
+            offset=(20, 20),
+            skip_first_screenshot=True
+        )
 
-        # Read coins, exit if < 24000 (total price for all roses)
-        # Try again next day if low
-        currency = OCR_SHOP_GOLD_COINS.ocr(self.device.image)
-        if currency < 24000:
-            logger.warn(f'Have: {currency}, Need: 24000. Try again next day')
-            return
-        logger.info('Purchasing all available weekly roses')
+    def pq_shop_weekly_items(self):
+        """
+        Execute purchase weekly items from shop routine
+        For roses, must have 24K+, try next day if low
+        For cake, must have 210+, try next day if low
+        All other items do not stack so just compares
+        against actual price
+        """
+        logger.hr(f'Get Weekly Items', level=2)
 
-        # Execute purchase operation
-        skip_first_screenshot=True
-        while 1:
-            if skip_first_screenshot:
-                skip_first_screenshot = False
-            else:
-                self.device.screenshot()
+        # Enter shop
+        self._pq_shop_enter()
 
-            # End
-            if self.appear(PRIVATE_QUARTERS_SHOP_WEEKLY_ROSES_GET, offset=(20, 20), interval=1):
-                self.device.click(PRIVATE_QUARTERS_SHOP_BACK)
-                break
-
-            if self.appear_then_click(PRIVATE_QUARTERS_SHOP_WEEKLY_ROSES_CHECK, offset=(20, 20), interval=1):
-                continue
-            if self.appear_then_click(PRIVATE_QUARTERS_SHOP_AMOUNT_MAX, offset=(20, 20), interval=1):
-                continue
-            if self.appear_then_click(PRIVATE_QUARTERS_SHOP_CONFIRM_AMOUNT, offset=(20, 20), interval=1):
-                continue
+        # Execute buy
+        self.shop_buy()
 
         # Exit shop
         self._pq_shop_exit()
 
-
-    def pq_interact(self):
+    def pq_execute_interact(self, target_ship):
         """
-        Execute target interact routine
-        """
-        click_iteration = 0
-        click_timer = Timer(1.5, count=3).start()
-        skip_first_screenshot = True
-        while 1:
-            if skip_first_screenshot:
-                skip_first_screenshot = False
-            else:
-                self.device.screenshot()
-
-            # End
-            if click_iteration > 2 and self.appear(PRIVATE_QUARTERS_INTERACT, offset=(20, 20)):
-                break
-
-            if click_timer.reached():
-                self.device.click(PRIVATE_QUARTERS_ROOM_TARGET_CLICK_AREA)
-                click_timer.reset()
-            if self.appear_then_click(PRIVATE_QUARTERS_INTERACT, offset=(20, 20), interval=1):
-                click_timer.reset()
-            if self.appear(PRIVATE_QUARTERS_INTERACT_CHECK, offset=(20, 20), interval=1):
-                self.device.click(PRIVATE_QUARTERS_ROOM_BACK)
-                click_timer.reset()
-                click_iteration += 1
-
-        self._pq_goto_room_exit()
-
-    def pq_goto_room(self, target_ship, retry=3):
-        """
-        Execute goto target's room routine
-        Try again if target absent in initial load
-        Limit to at most configured 'retry' count
+        Execute interaction sequence with
+        target ship girl
 
         Args:
             target_ship (str):
-            retry  (int):
         """
-        success = False
-        target_title = target_ship.title()
+        # Verify target is a valid selectable
+        target_title = target_ship.title().replace('_', ' ')
+        if target_ship not in self.available_targets:
+            logger.error(f'Unsupported target ship: {target_title}, cannot continue subtask')
+            return
 
-        for _ in range(retry):
-            if not self._pq_goto_room_enter(target_ship):
-                break
+        # Handle if target is not in initial load
+        # Limit to 3 tries
+        if not self.pq_goto_room(target_ship, retry=3):
+            return
 
-            if self._pq_target_appear():
-                logger.info(f'{target_title} is waiting and excited for your arrival!')
-                success = True
-                break
-            logger.warn(f'{target_title} is not ready, exit and try again; retry={retry - (_ + 1)}')
+        # Execute 'interact' routine
+        self.pq_interact()
 
-            self._pq_goto_room_exit()
-
-        return success
-
-    def pq_run(self, buy_roses, target_interact, target_ship):
+    def pq_run(self, buy_roses, buy_cake, target_interact, target_ship):
         """
         Execute daily private quarters routine
         - Purchase weekly roses from shop
@@ -265,36 +133,40 @@ class PrivateQuarters(UI):
 
         Args:
             buy_roses       (bool):
+            buy_cake        (bool):
             target_interact (bool):
             target_ship     (str):
         """
-        logger.info('Private Quarters run')
+        logger.hr(f'Private Quarters Run', level=1)
+        target_title = target_ship.title().replace('_', ' ')
+        logger.info(f'Task configured for Buy_Roses={buy_roses}, '
+                    f'Buy_Cake={buy_cake}, '
+                    f'Interact_ShipGirl={target_interact}, '
+                    f'Target_ShipGirl={target_title}')
 
-        # Enter shop and spend coin for weekly roses if enabled
-        if buy_roses:
-            self.pq_shop_weekly_roses()
+        # Enter shop and buy weekly items (if any)
+        if self.shop_filter:
+            if server.server not in ['tw']:
+                self.pq_shop_weekly_items()
+            else:
+                logger.info(f'Private Quarters shop not supported for {server.server} server.')
 
         # Interact with target if enabled
         if target_interact:
+            # Ensure target is supported for server
+            # Update `not_supported_filter` to enable a target
+            if target_ship in self.not_supported_filter[server.server]:
+                logger.info(f'Target ship:{target_ship} not supported for {server.server} server.')
+                return
+
             # Pull count here, exit run if = 0
-            count, _, _ = OCR_DAILY_COUNT.ocr(self.device.image)
+            count = self._pq_get_daily_count(retry=3)
             if count == 0:
                 logger.info('Daily intimacy count exhausted, exit subtask')
                 return
 
-            # Verify target is a valid selectable
-            target_title = target_ship.title()
-            if target_ship not in self.available_targets:
-                logger.error(f'Unsupported target ship: {target_title}, cannot continue subtask')
-                return
-
-            # Handle if target is not in initial load
-            # Limit to 3 tries
-            if not self.pq_goto_room(target_ship, retry=3):
-                return
-
-            # Execute 'interact' routine
-            self.pq_interact()
+            # Able to interact with target, execute
+            self.pq_execute_interact(target_ship)
 
     def run(self):
         """
@@ -302,11 +174,12 @@ class PrivateQuarters(UI):
             in: Any page
             out: page_main, may have info_bar
         """
+        self.ui_ensure(page_dormmenu)
         self.ui_goto(page_private_quarters, get_ship=False)
         self.handle_info_bar()
-
         self.pq_run(
             buy_roses=self.config.PrivateQuarters_BuyRoses,
+            buy_cake=self.config.PrivateQuarters_BuyCake,
             target_interact=self.config.PrivateQuarters_TargetInteract,
             target_ship=self.config.PrivateQuarters_TargetShip
         )

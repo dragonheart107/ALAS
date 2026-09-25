@@ -10,6 +10,8 @@ import uiautomator2cache
 from adbutils import AdbTimeout
 from lxml import etree
 
+from module.device.method.remove_warning import remove_shell_warning
+
 try:
     # adbutils 0.x
     from adbutils import _AdbStreamConnection as AdbConnection
@@ -279,19 +281,19 @@ def get_serial_pair(serial):
         serial (str):
 
     Returns:
-        str, str: `127.0.0.1:5555+{X}` and `emulator-5554+{X}`, 0 <= X <= 32
+        tuple[Optional[str], Optional[str]]: `127.0.0.1:5555+{X}` and `emulator-5554+{X}`, 0 <= X <= 32
     """
     if serial.startswith('127.0.0.1:'):
         try:
             port = int(serial[10:])
-            if 5555 <= port <= 5555 + 32:
+            if 5555 <= port <= 5555 + 64:
                 return f'127.0.0.1:{port}', f'emulator-{port - 1}'
         except (ValueError, IndexError):
             pass
     if serial.startswith('emulator-'):
         try:
             port = int(serial[9:])
-            if 5554 <= port <= 5554 + 32:
+            if 5554 <= port <= 5554 + 64:
                 return f'127.0.0.1:{port + 1}', f'emulator-{port}'
         except (ValueError, IndexError):
             pass
@@ -299,62 +301,52 @@ def get_serial_pair(serial):
     return None, None
 
 
-def remove_prefix(s, prefix):
+@t.overload
+def removeprefix(s: str, prefix: str) -> str: ...
+
+
+@t.overload
+def removeprefix(s: bytes, prefix: bytes) -> bytes: ...
+
+
+@t.overload
+def removesuffix(s: str, suffix: str) -> str: ...
+
+
+@t.overload
+def removesuffix(s: bytes, suffix: bytes) -> bytes: ...
+
+
+def removeprefix(s, prefix):
     """
-    Remove prefix of a string or bytes like `string.removeprefix(prefix)`, which is on Python3.9+
+    Backport `string.removeprefix(prefix)`, which is on Python>=3.9
 
     Args:
-        s (str, bytes):
-        prefix (str, bytes):
+        s (str | bytes):
+        prefix (str | bytes):
 
     Returns:
-        str, bytes:
+        str | bytes:
     """
-    return s[len(prefix):] if s.startswith(prefix) else s
+    if s.startswith(prefix):
+        return s[len(prefix):]
+    return s
 
 
-def remove_suffix(s, suffix):
+def removesuffix(s, suffix):
     """
-    Remove suffix of a string or bytes like `string.removesuffix(suffix)`, which is on Python3.9+
+    Backport `string.removesuffix(suffix)`, which is on Python>=3.9
 
     Args:
-        s (str, bytes):
-        suffix (str, bytes):
+        s (str | bytes):
+        suffix (str | bytes):
 
     Returns:
-        str, bytes:
+        str | bytes:
     """
-    return s[:-len(suffix)] if s.endswith(suffix) else s
-
-
-def remove_shell_warning(s):
-    """
-    Remove warnings from shell
-
-    Warnings in VMOS shell
-    https://github.com/LmeSzinc/AzurLaneAutoScript/issues/1425
-    WARNING: linker: [vdso]: unused DT entry: type 0x70000001 arg 0x0\n\x89PNG\r\n\x1a\n\x00\x00\x00\rIH
-
-    Errors in waydroid screencap render
-    https://github.com/LmeSzinc/AzurLaneAutoScript/issues/4760
-    Failed to create //.cache for shader cache (Read-only file system)---disabling.\n
-
-    Args:
-        s (str, bytes):
-
-    Returns:
-        str, bytes:
-    """
-    if isinstance(s, bytes):
-        if s.startswith(b'WARNING'):
-            _, _, s = s.partition(b'\n')
-        if s.startswith(b'Failed'):
-            _, _, s = s.partition(b'\n')
-    elif isinstance(s, str):
-        if s.startswith('WARNING'):
-            _, _, s = s.partition('\n')
-        if s.startswith('Failed'):
-            _, _, s = s.partition('\n')
+    # s[:-0] is empty string, so we need to check if suffix is empty
+    if suffix and s.endswith(suffix):
+        return s[:-len(suffix)]
     return s
 
 

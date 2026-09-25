@@ -10,7 +10,7 @@ from module.ui.ui import UI
 
 class MailSelectSetting(Setting):
     def is_option_active(self, option: Button) -> bool:
-        return self.main.image_color_count(option, color=(57, 56, 57), threshold=221, count=50)
+        return self.main.image_color_count(option, color=(57, 56, 57), threshold=30, count=50)
 
 
 class MailWhite(UI):
@@ -255,9 +255,6 @@ class MailWhite(UI):
                     f'trade_license={trade_license}, delete={delete}')
         if not merit and not maintenance and not trade_license:
             logger.warning('Nothing to claim')
-            return False
-        if self.config.SERVER not in ['cn', 'en', 'jp']:
-            logger.warning(f'Mail is not supported in {self.config.SERVER}, please contact server maintainers')
             return False
 
         # Must using white UI

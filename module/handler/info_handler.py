@@ -118,7 +118,7 @@ class InfoHandler(ModuleBase):
             return True
         if self.appear(POPUP_CANCEL_WHITE, offset=offset, interval=interval):
             POPUP_CANCEL_WHITE.name = POPUP_CANCEL_WHITE.name + '_' + name
-            self.device.click(POPUP_CONFIRM_WHITE)
+            self.device.click(POPUP_CANCEL_WHITE)
             POPUP_CANCEL_WHITE.name = POPUP_CANCEL_WHITE.name[:-len(name) - 1]
             return True
         return False
@@ -169,7 +169,7 @@ class InfoHandler(ModuleBase):
         # Hot fixes will kill AL if you clicked the confirm button
         if self._hot_fix_check_wait.reached():
             self._hot_fix_check_wait.clear()
-        if self._hot_fix_check_wait.started() and 3 <= self._hot_fix_check_wait.current() <= 6:
+        if self._hot_fix_check_wait.started() and 3 <= self._hot_fix_check_wait.current_time() <= 6:
             if not self.device.app_is_running():
                 logger.error('Detected hot fixes from game server, game died')
                 raise GameNotRunningError
@@ -203,24 +203,30 @@ class InfoHandler(ModuleBase):
             return False
 
         if self.appear(USE_DATA_KEY, offset=(20, 20)):
-            skip_first_screenshot = True
-            while 1:
-                if skip_first_screenshot:
-                    skip_first_screenshot = False
-                else:
-                    self.device.screenshot()
-
+            # enable USE_DATA_KEY_NOTIFIED
+            for _ in self.loop():
                 enabled = self.image_color_count(
-                    USE_DATA_KEY_NOTIFIED, color=(140, 207, 66), threshold=180, count=10)
+                    USE_DATA_KEY_NOTIFIED, color=(140, 207, 66), threshold=75, count=10)
                 if enabled:
                     break
-
                 if self.appear(USE_DATA_KEY, offset=(20, 20), interval=5):
                     self.device.click(USE_DATA_KEY_NOTIFIED)
                     continue
 
             self.config.USE_DATA_KEY = False  # Reset on success as task can be stopped before can be recovered
-            return self.handle_popup_confirm('USE_DATA_KEY')
+
+            # click confirm
+            # POPUP_CONFIRM from data key page has minor differece from the standard one
+            # so we just bind clicking it
+            self.interval_clear(USE_DATA_KEY, interval=5)
+            for _ in self.loop():
+                if not self.appear(USE_DATA_KEY, offset=(20, 20)):
+                    break
+                if self.appear(USE_DATA_KEY, offset=(20, 20), interval=5):
+                    self.device.click(POPUP_CONFIRM)
+                    continue
+
+            return True
 
         return False
 
@@ -242,9 +248,28 @@ class InfoHandler(ModuleBase):
         """
         return self.appear_then_click(GET_SKIN, offset=(20, 20), interval=2)
 
+    def handle_get_items_ship(self, drop=None):
+        """
+        2026.06.12 added different GET_ITEMS popup when getting ship
+
+        Args:
+            drop (DropImage):
+
+        Returns:
+            bool:
+        """
+        if self.appear(GET_ITEMS_SHIP_1, offset=5, interval=2):
+            if drop:
+                drop.handle_add(self)
+            self.device.click(GET_ITEMS_SHIP_1)
+            return True
+
+        return False
+
     """
     Guild popup info
     """
+
     def handle_guild_popup_confirm(self):
         if self.appear(GUILD_POPUP_CANCEL, offset=self._popup_offset) \
                 and self.appear(GUILD_POPUP_CONFIRM, offset=self._popup_offset, interval=2):
@@ -264,6 +289,7 @@ class InfoHandler(ModuleBase):
     """
     Mission popup info
     """
+
     def handle_mission_popup_go(self):
         if self.appear(MISSION_POPUP_ACK, offset=self._popup_offset) \
                 and self.appear(MISSION_POPUP_GO, offset=self._popup_offset, interval=2):
@@ -338,11 +364,12 @@ class InfoHandler(ModuleBase):
             list[Button]: List of story options, from upper to bottom. If no option found, return an empty list.
         """
         # Area to detect the options, should include at least 3 options.
-        story_option_area = (330, 200, 980, 465)
-        story_detect_area = (330, 200, 355, 465)
+        story_option_area = (330, 135, 980, 555)
+        story_detect_area = (330, 135, 355, 555)
         story_option_color = (247, 247, 247)
 
         image = color_similarity_2d(self.image_crop(story_detect_area, copy=False), color=story_option_color)
+        cv2.morphologyEx(image, cv2.MORPH_CLOSE, kernel=np.ones((5, 5), dtype=np.uint8), dst=image)
         line = cv2.reduce(image, 1, cv2.REDUCE_AVG).flatten()
         line[line < 200] = 0
         line[line >= 200] = 255
@@ -447,9 +474,6 @@ class InfoHandler(ModuleBase):
                 self.interval_clear(STORY_SKIP_3)
         else:
             self._story_confirm.reset()
-        if self.appear_then_click(GAME_TIPS, offset=(20, 20), interval=2):
-            self.story_popup_timeout.reset()
-            return True
         if self.appear_then_click(STORY_CLOSE, offset=(10, 10), interval=2):
             self.story_popup_timeout.reset()
             return True
@@ -494,19 +518,70 @@ class InfoHandler(ModuleBase):
     """
     Game tips
     """
+
     def handle_game_tips(self):
         """
         Returns:
             bool: If handled
         """
-        if self.appear(GAME_TIPS, offset=(20, 20), interval=2):
+        if self.appear(GAME_TIPS, offset=(20, 20), interval=2) and self.image_color_count(
+                GAME_TIPS.button, color=(40, 40, 40), threshold=15, count=50):
             self.device.click(GAME_TIPS)
             return True
-        if self.appear(GAME_TIPS3, offset=(20, 20), interval=2):
+        if self.appear(GAME_TIPS3, offset=(20, 20), interval=2) and self.image_color_count(
+                GAME_TIPS3.button, color=(40, 40, 40), threshold=15, count=50):
             self.device.click(GAME_TIPS)
             return True
-        if self.appear(GAME_TIPS4, offset=(20, 20), interval=2):
+        if self.appear(GAME_TIPS4, offset=(20, 20), interval=2) and self.image_color_count(
+                GAME_TIPS4.button, color=(40, 40, 40), threshold=15, count=50):
             self.device.click(GAME_TIPS)
             return True
 
         return False
+
+    """
+    Manjuu loading
+    """
+
+    def manjuu_count(self):
+        """
+        detect manjuu count by template matching
+        Returns:
+            int: Number of manjuu
+        """
+        image = self.image_crop(MANJUU_AREA, copy=False)
+        # Default 0.85 will not work for manjuu, because the face will be stretched
+        # and shrinked, so the template will not match.
+        # Use 0.8 to match the deformed face.
+        buttons = TEMPLATE_MANJUU.match_multi(image, similarity=0.8, name='INFO_MANJUU')
+        return len(buttons)
+
+    def wait_until_manjuu_disappear(self):
+        """
+        Wait until manjuu loading disappear.
+        """
+        # Abuse of notation. Template do not have readable name, so add string here.
+        self.device.stuck_record_add('TEMPLATE_MANJUU')
+        timer = Timer(1.5, count=3).start()
+        while 1:
+            self.device.screenshot()
+            if self.manjuu_count():
+                timer.reset()
+            else:
+                if timer.reached():
+                    logger.info(f'Manjuu disappeared')
+                    break
+    
+    def handle_manjuu(self):
+        """
+        Handle manjuu loading.
+        Returns:
+            bool: If handled
+        """
+        count = self.manjuu_count()
+        if count > 2:
+            logger.info(f'Manjuu count: {count}, waiting for manjuu to disappear')
+            self.wait_until_manjuu_disappear()
+            return True
+        else:
+            return False

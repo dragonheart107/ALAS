@@ -8,15 +8,59 @@ from module.handler.auto_search import AutoSearchHandler
 from module.logger import logger
 from module.ui.switch import Switch
 
-FAST_FORWARD = Switch('Fast_Forward')
-FAST_FORWARD.add_state('on', check_button=FAST_FORWARD_ON)
-FAST_FORWARD.add_state('off', check_button=FAST_FORWARD_OFF)
 FLEET_LOCK = Switch('Fleet_Lock', offset=(5, 20))
 FLEET_LOCK.add_state('on', check_button=FLEET_LOCKED)
 FLEET_LOCK.add_state('off', check_button=FLEET_UNLOCKED)
-AUTO_SEARCH = Switch('Auto_Search', offset=(20, 20))
-AUTO_SEARCH.add_state('on', check_button=AUTO_SEARCH_ON)
-AUTO_SEARCH.add_state('off', check_button=AUTO_SEARCH_OFF)
+
+
+class SwitchClearMode(Switch):
+    def get(self, main):
+        title = main.appear(CLEAR_MODE_TITLE, offset=(20, 20))
+        if not title:
+            return 'unknown'
+        # find check area to the right of title
+        CLEAR_MODE_CHECK.load_offset(CLEAR_MODE_TITLE)
+        # cyan letter is `on`
+        if main.image_color_count(CLEAR_MODE_CHECK.button, color=(130, 229, 255), threshold=30, count=50):
+            return 'on'
+        # white button is `off`
+        if main.image_color_count(CLEAR_MODE_CHECK.button, color=(255, 255, 255), threshold=30, count=200):
+            return 'off'
+        return 'unknown'
+
+
+CLEAR_MODE = SwitchClearMode('Clear_Mode')
+CLEAR_MODE.add_state('on', check_button=CLEAR_MODE_TITLE, click_button=CLEAR_MODE_CHECK)
+CLEAR_MODE.add_state('off', check_button=CLEAR_MODE_TITLE, click_button=CLEAR_MODE_CHECK)
+
+
+class SwitchAutoSearch(Switch):
+    def get(self, main):
+        title = None
+        if main.appear(AUTO_SEARCH_TITLE, offset=(20, 20)):
+            title = AUTO_SEARCH_TITLE
+        # [JP] has different character spacing in hard mode and normal mode
+        if not title:
+            if main.appear(AUTO_SEARCH_TITLE2, offset=(20, 20)):
+                title = AUTO_SEARCH_TITLE2
+        if not title:
+            if main.appear(AUTO_SEARCH_TITLE3, offset=(20, 20)):
+                title = AUTO_SEARCH_TITLE3
+        if not title:
+            return 'unknown'
+        # find check area to the right of title
+        AUTO_SEARCH_CHECK.load_offset(title)
+        # green square is `on`
+        if main.image_color_count(AUTO_SEARCH_CHECK.button, color=(158, 234, 94), threshold=30, count=50):
+            return 'on'
+        # no way to detect `off`
+        # return `off` if title appears and it's not `on`
+        return 'off'
+
+
+AUTO_SEARCH = SwitchAutoSearch('Auto_Search')
+AUTO_SEARCH.add_state('on', check_button=AUTO_SEARCH_TITLE, click_button=AUTO_SEARCH_CHECK)
+AUTO_SEARCH.add_state('off', check_button=AUTO_SEARCH_TITLE, click_button=AUTO_SEARCH_CHECK)
 
 
 def map_files(event):
@@ -116,14 +160,15 @@ class FastForwardHandler(AutoSearchHandler):
         > 13-1 > 13-2 > 13-3 > 13-4
         > 14-1 > 14-2 > 14-3 > 14-4
         > 15-1 > 15-2 > 15-3 > 15-4
+        > 16-1 > 16-2 > 16-3 > 16-4
         """,
         'A1 > A2 > A3',
         'B1 > B2 > B3',
         'C1 > C2 > C3',
         'D1 > D2 > D3',
         'SP1 > SP2 > SP3 > SP4 > SP5',
-        'T1 > T2 > T3 > T4',
-        'HT1 > HT2 > HT3 > HT4',
+        'T1 > T2 > T3 > T4 > T5 > T6',
+        'HT1 > HT2 > HT3 > HT4 > HT5 > HT6',
     ]
     map_fleet_checked = False
 
@@ -133,19 +178,19 @@ class FastForwardHandler(AutoSearchHandler):
             | INFO | [Map_info] 98%, star_1, star_2, star_3, clear, 3_star, green, fast_forward
         """
         self.map_clear_percentage = self.get_map_clear_percentage()
-        self.map_achieved_star_1 = self.appear(MAP_STAR_1)
-        self.map_achieved_star_2 = self.appear(MAP_STAR_2)
-        self.map_achieved_star_3 = self.appear(MAP_STAR_3)
+        self.map_achieved_star_1 = self._is_map_star_active(MAP_STAR_1)
+        self.map_achieved_star_2 = self._is_map_star_active(MAP_STAR_2)
+        self.map_achieved_star_3 = self._is_map_star_active(MAP_STAR_3)
         self.map_is_100_percent_clear = self.map_clear_percentage > 0.95
         self.map_is_3_stars = self.map_achieved_star_1 and self.map_achieved_star_2 and self.map_achieved_star_3
-        self.map_is_threat_safe = self.appear(MAP_GREEN)
+        self.map_is_threat_safe = self.appear(MAP_GREEN, offset=(20, 20))
         if self.config.Campaign_Name.lower() == 'sp':
             # Minor issue here
             # Using auto_search option because clear mode cannot be detected whether on SP
             # If user manually turn off auto search, alas can't enable it again
             self.map_has_clear_mode = AUTO_SEARCH.appear(main=self)
         else:
-            self.map_has_clear_mode = self.map_is_100_percent_clear and FAST_FORWARD.appear(main=self)
+            self.map_has_clear_mode = self.map_is_100_percent_clear and CLEAR_MODE.appear(main=self)
 
         # Override config
         if self.map_achieved_star_1:
@@ -204,8 +249,13 @@ class FastForwardHandler(AutoSearchHandler):
             pass
 
         state = 'on' if self.config.Campaign_UseClearMode else 'off'
-        changed = FAST_FORWARD.set(state, main=self)
+        changed = CLEAR_MODE.set(state, main=self)
+        if changed:
+            self.map_wait_auto_search()
         return changed
+
+    def _is_map_star_active(self, button):
+        return self.image_color_count(button, color=(250, 232, 140), threshold=75, count=35)
 
     def handle_map_fleet_lock(self, enable=None):
         """
@@ -227,6 +277,25 @@ class FastForwardHandler(AutoSearchHandler):
         changed = FLEET_LOCK.set(state, main=self)
 
         return changed
+
+    def map_wait_auto_search(self):
+        """
+        When enabling clear mode (FAST_FORWARD), AUTO_SEARCH has an animation to appear
+        wait until it fully appeared
+
+        Returns:
+            bool: If waited
+        """
+        timeout = Timer(1, count=3).start()
+        for _ in self.loop():
+            state = AUTO_SEARCH.get(main=self)
+            logger.attr('AUTO_SEARCH', state)
+            if state != 'unknown':
+                return True
+            if timeout.reached():
+                # some maps may have clear mode but don't have auto search
+                logger.info('map wait auto search timeout')
+                return False
 
     def handle_auto_search(self):
         """
@@ -283,7 +352,8 @@ class FastForwardHandler(AutoSearchHandler):
             return False
         if not self.is_call_submarine_at_boss:
             return False
-        if not self.map_is_auto_search:
+        # 2025.09.22, correct that fleet role settings is unlocked after clear mode
+        if not self.map_is_clear_mode:
             logger.warning('Can not set submarine call because auto search not available, assuming disabled')
             logger.warning('Please do the followings: '
                            'goto any stage -> auto search role -> set submarine role to standby')
@@ -319,7 +389,10 @@ class FastForwardHandler(AutoSearchHandler):
         Pages:
             in: MAP_PREPARATION
         """
-        return color_bar_percentage(self.device.image, area=MAP_CLEAR_PERCENTAGE.area, prev_color=(231, 170, 82))
+        percent = color_bar_percentage(self.device.image, area=MAP_CLEAR_PERCENTAGE.area, prev_color=(231, 170, 82))
+        if self.config.MAP_CLEAR_PERCENTAGE_SHORT:
+            percent *= 1.4
+        return percent
 
     def campaign_name_increase(self, name):
         """
@@ -337,8 +410,7 @@ class FastForwardHandler(AutoSearchHandler):
         # Insert custom increase logic
         if self.config.STAGE_INCREASE_AB:
             stage_increase = [
-                'A1 > A2 > A3 > B1 > B2 > B3',
-                'C1 > C2 > C3 > D1 > D2 > D3',
+                'A1 > A2 > A3 > B1 > B2 > B3',                
             ] + stage_increase
         custom = self.config.STAGE_INCREASE_CUSTOM
         if custom:
@@ -451,7 +523,7 @@ class FastForwardHandler(AutoSearchHandler):
 
             if self.appear(check_button, offset=self._auto_search_menu_offset, interval=3):
                 box_button.load_offset(check_button)
-                enabled = self.image_color_count(box_button.button, color=(156, 255, 82), threshold=221, count=20)
+                enabled = self.image_color_count(box_button.button, color=(156, 255, 82), threshold=30, count=20)
                 if (status == 'on' and enabled) or (status == 'off' and not enabled):
                     return True
                 if (status == 'on' and not enabled) or (status == 'off' and enabled):
@@ -509,6 +581,12 @@ class FastForwardHandler(AutoSearchHandler):
 
         return False
 
+    def handle_submarine_support_popup(self):
+        """
+        Should be rewritten in W16 submarine base class
+        """
+        return False
+
     def handle_map_walk_speedup(self, skip_first_screenshot=True):
         """
         Turn on walk speedup, no reason to turn it off
@@ -524,7 +602,7 @@ class FastForwardHandler(AutoSearchHandler):
             else:
                 self.device.screenshot()
 
-            if self.image_color_count(MAP_WALK_SPEEDUP, color=(132, 255, 148), threshold=180, count=50):
+            if self.image_color_count(MAP_WALK_SPEEDUP, color=(132, 255, 148), threshold=75, count=50):
                 logger.attr('Walk_Speedup', 'on')
                 return True
             if timeout.reached():
