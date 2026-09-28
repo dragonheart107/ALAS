@@ -140,8 +140,8 @@ class IslandDock(IslandUI):
                 continue
 
     def island_dock_select_manjuu(self):
+        self.ensure_dock_page_at_top()
         self.island_dock_sort_method_dsc_set(enable=False, wait_loading=True)
-        # self.ensure_dock_page_at_top()  # not necessary for now since usually Manjuu is searched first
         scanner = CharacterScanner(self.dock_grid, identity=['Manjuu'], status='free')
         candidates = scanner.scan(self.device.image)
         if candidates:
@@ -215,3 +215,314 @@ class IslandDock(IslandUI):
                 drag_count = 0
         logger.warning('Failed to find any character not in blacklist')
         return None
+
+    def island_dock_select_named_characters(self, identity_a, identity_b):
+        """
+        Search the dock in a single forward sweep for exactly two named
+        characters, selecting each one immediately as it's found.
+        """
+        found = {identity_a: None, identity_b: None}
+        self.ensure_dock_page_at_top()
+        self.island_dock_sort_method_dsc_set(enable=True)
+        ISLAND_DOCK_DETECT.load_color(self.device.image)
+        ISLAND_DOCK_DETECT._match_init = True
+        drag_count = 0
+        for _ in self.loop(timeout=40, skip_first=False):
+            scanner = CharacterScanner(
+                self.dock_grid,
+                identity=[i for i in (identity_a, identity_b) if found[i] is None],
+                status=None
+            )
+            candidates = scanner.scan(self.device.image)
+            for candidate in candidates:
+                if found.get(candidate.identity) is None and candidate.identity in found:
+                    found[candidate.identity] = candidate
+                    if candidate.status == 'free':
+                        self.island_dock_select_one(candidate.button)
+            if all(v is not None for v in found.values()):
+                break
+            self.next_dock_page()
+            drag_count += 1
+            if self.appear(ISLAND_DOCK_DETECT, offset=(20, 20)):
+                if drag_count >= 2:
+                    logger.warning('Reached end of dock page')
+                    break
+            else:
+                ISLAND_DOCK_DETECT.load_color(self.device.image)
+                drag_count = 0
+        else:
+            missing = [k for k, v in found.items() if v is None]
+            logger.warning(f'Failed to find all requested characters: {missing}')
+        return found
+
+    def island_dock_find_characters_from_pool(self, pool, dispatched_characters, min_stamina):
+        """
+        Search the dock in a single forward sweep for any character in the pool
+        that is free and has enough stamina.
+        
+        Args:
+            pool (list[str]): Priority-ordered character names from config.
+            dispatched_characters (set[str]): Already dispatched characters.
+            min_stamina (int): Minimum emotion/stamina required.
+        
+        Returns:
+            Character or None: The highest-priority eligible character found.
+        """
+        self.ensure_dock_page_at_top()
+        self.island_dock_sort_method_dsc_set(enable=True)
+        ISLAND_DOCK_DETECT.load_color(self.device.image)
+        ISLAND_DOCK_DETECT._match_init = True
+        drag_count = 0
+        
+        # Track which pool characters we've found
+        found_characters = {}
+        
+        for _ in self.loop(timeout=40, skip_first=False):
+            # Only scan for pool characters we haven't found yet
+            remaining = [name for name in pool if name not in found_characters and name not in dispatched_characters]
+            if not remaining:
+                break
+                
+            scanner = CharacterScanner(
+                self.dock_grid,
+                identity=remaining,
+                status='free'  # Only look for free characters
+            )
+            candidates = scanner.scan(self.device.image)
+            
+            for candidate in candidates:
+                if candidate.identity not in found_characters and candidate.identity in remaining:
+                    found_characters[candidate.identity] = candidate
+                    # If this character has enough stamina and is free, return it immediately
+                    if candidate.status == 'free' and candidate.emotion >= min_stamina:
+                        logger.info(f'Found eligible character: {candidate.identity} (emotion: {candidate.emotion})')
+                        return candidate
+            
+            # Go to next page
+            self.next_dock_page()
+            drag_count += 1
+            
+            # Check if we've reached the end
+            if self.appear(ISLAND_DOCK_DETECT, offset=(20, 20)):
+                if drag_count >= 2:
+                    logger.info(f'Reached end of dock page, found {len(found_characters)} characters from pool')
+                    break
+            else:
+                ISLAND_DOCK_DETECT.load_color(self.device.image)
+                drag_count = 0
+        
+        # Check if any found character is eligible (free + enough stamina)
+        for name in pool:
+            if name in dispatched_characters:
+                continue
+            if name in found_characters:
+                char = found_characters[name]
+                if char.status == 'free' and char.emotion >= min_stamina:
+                    return char
+        
+        logger.info('No eligible characters found in pool')
+        return None
+
+    def extract_character_templates(self, folder_path='./assets/island/character/'):
+        """
+        must start in dock selection page, extract character templates,
+        EN can name file after ocr results, other servers need manual renaming
+        """
+        import os
+        from PIL import Image
+        import re
+        import unicodedata
+        from module.ocr.ocr import Ocr
+        from module.base.button import Button
+        from module.island.assets import ISLAND_CLICK_SAFE_AREA
+
+        if not self.is_in_island_dock():
+            logger.warning('not in dock')
+            return False
+        
+        self.ensure_dock_page_at_top()
+        self.island_dock_sort_method_dsc_set(enable=True)
+        os.makedirs(folder_path, exist_ok=True)
+        
+        # Get existing templates
+        existing_templates = set()
+        for filename in os.listdir(folder_path):
+            if filename.endswith('.png'):
+                name = filename[:-4].lower()
+                existing_templates.add(name)
+        logger.info(f'Found {len(existing_templates)} existing templates')
+        
+        # Check server
+        is_en_server = getattr(self.config, 'SERVER', '').lower() == 'en'
+        logger.info(f'Server: {self.config.SERVER}, Using OCR: {"Yes" if is_en_server else "No"}')
+        
+        # Name display area when a card is selected
+        NAME_DISPLAY_AREA = (928, 91, 1252, 130)
+
+        if is_en_server:
+            name_button = Button(
+                area=NAME_DISPLAY_AREA,
+                color=(255, 255, 255),
+                button=NAME_DISPLAY_AREA,
+                name='CHARACTER_NAME'
+            )
+            name_ocr = Ocr(
+                buttons=[name_button],
+                lang='cnocr',
+                letter=(255, 255, 255),
+                threshold=128,
+                name='SELECTED_CHARACTER_NAME'
+            )
+        
+        TEMPLATE_AREA = (30, 16, 92, 66)
+        
+        def clean_character_name(raw_name):
+            if not raw_name or not raw_name.strip():
+                return None
+            
+            # Remove everything from "-L" or "–L" onward (including the -L)
+            name = re.sub(r'[-–]L.*$', '', raw_name, flags=re.IGNORECASE)
+            
+            # Strip whitespace
+            name = name.strip()
+            
+            if not name:
+                return None
+            
+            # Normalize Unicode characters (é -> e, etc.)
+            name = unicodedata.normalize('NFKD', name)
+            name = ''.join(c for c in name if not unicodedata.combining(c))
+            
+            # Replace spaces and special characters with underscores
+            name = re.sub(r'[^a-zA-Z0-9]', '_', name)  # Remove everything except letters and numbers
+            name = re.sub(r'_+', '_', name)  # Collapse multiple underscores
+            name = name.strip('_')
+            
+            return name
+        
+        extracted = 0
+        skipped = 0
+        
+        # Use max 5 swipes/pages, may need adjustments in the future at some point
+        MAX_PAGES = 5
+        
+        # Store identities from previous page to detect if page changed
+        previous_identities = None
+        
+        for page in range(MAX_PAGES):
+            logger.info(f'Processing page {page + 1}/{MAX_PAGES}')
+            
+            # Get all cards on current page
+            scanner = CharacterScanner(self.dock_grid, identity='any', status=None)
+            characters = scanner.scan(self.device.image, cached=False, output=False)
+            
+            if not characters:
+                logger.info('No characters found on current page')
+                break
+            
+            # Get current page identities for comparison
+            current_identities = [char.identity for char in characters]
+            
+            # Check if page actually changed (only after first page)
+            if previous_identities is not None:
+                # Check if all characters are the same (page didn't change)
+                if current_identities == previous_identities:
+                    logger.info('Page content identical to previous page - reached end of dock')
+                    break
+                
+                # Also check if there's significant overlap
+                overlap_count = sum(1 for id1 in current_identities if id1 in previous_identities)
+                overlap_ratio = overlap_count / max(len(current_identities), len(previous_identities))
+                if overlap_ratio > 0.8 and len(current_identities) == len(previous_identities):
+                    logger.info(f'High overlap ({overlap_ratio:.1%}) with previous page - reached end of dock')
+                    break
+            
+            # Process each character
+            for char in characters:
+                # Quick identity check
+                if char.identity and char.identity != 'unknown':
+                    if char.identity.lower() in existing_templates:
+                        skipped += 1
+                        continue
+                
+                # Get filename based on server
+                filename = None
+                should_save = False
+                
+                if is_en_server:
+                    # EN Server: Use OCR for name
+                    self.device.click(char.button)
+                    self.device.sleep(0.2)
+                    self.device.screenshot()
+                    
+                    ocr_results = name_ocr.ocr(self.device.image)
+                    
+                    clean_name = clean_character_name(ocr_results)
+                    
+                    if clean_name:
+                        logger.info(f'Cleaned name: "{clean_name}"')
+                        
+                        if clean_name.lower() not in existing_templates:
+                            should_save = True
+                            filename = f'{clean_name}.png'
+                        else:
+                            logger.info(f'Skipping existing: {clean_name}')
+                    elif char.identity and char.identity != 'unknown':
+                        # Fallback to identity if OCR fails
+                        if char.identity.lower() not in existing_templates:
+                            should_save = True
+                            filename = f'{char.identity}.png'
+                            logger.info(f'OCR failed, using identity: {char.identity}')
+                    
+                    self.device.click(ISLAND_CLICK_SAFE_AREA)
+                    self.device.sleep(0.3)
+                    
+                else:
+                    # Non-EN Server: Use identity only
+                    if char.identity and char.identity != 'unknown':
+                        if char.identity.lower() not in existing_templates:
+                            should_save = True
+                            filename = f'{char.identity}.png'
+                        else:
+                            logger.info(f'Skipping existing: {char.identity}')
+                    else:
+                        from datetime import datetime
+                        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S_%f')[:21]
+                        should_save = True
+                        filename = f'UNKNOWN_{timestamp}.png'
+                
+                # Save if needed
+                if should_save and filename:
+                    card_area = char.button.area
+                    template_area = (
+                        card_area[0] + TEMPLATE_AREA[0],
+                        card_area[1] + TEMPLATE_AREA[1],
+                        card_area[0] + TEMPLATE_AREA[2],
+                        card_area[1] + TEMPLATE_AREA[3]
+                    )
+                    
+                    img_np = self.image_crop(template_area, copy=True)
+                    Image.fromarray(img_np).save(os.path.join(folder_path, filename))
+                    
+                    existing_templates.add(filename[:-4].lower())
+                    extracted += 1
+                    logger.info(f'Saved: {filename}')
+                else:
+                    skipped += 1
+            
+            # Store current identities for next iteration comparison
+            previous_identities = current_identities
+            
+            # Don't swipe on the last page
+            if page == MAX_PAGES - 1:
+                logger.info('Reached maximum page limit')
+                break
+            
+            # Try to swipe to next page
+            logger.info(f'Swiping to page {page + 2}')
+            self.next_dock_page(wait_loading=True)
+        
+        logger.info(f'Extracted {extracted} new templates, skipped {skipped} existing')
+        logger.info(f'Templates saved to: {folder_path}')
+        self.ensure_dock_page_at_top()
+        return True
