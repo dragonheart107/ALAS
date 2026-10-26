@@ -1,0 +1,193 @@
+name: Deduplicate server assets
+
+# Manual only. Runs in the fork:
+#   1. takes upstream LmeSzinc/AzurLaneAutoScript master (or the existing `autodedupe` branch)
+#   2. deletes en/jp/tw assets that are identical to the cn version
+#   3. regenerates module/*/assets.py with dev_tools/button_extract.py and verifies that
+#      no area/color/button value changed (files behind a change are restored automatically)
+#   4. commits the result and pushes it to the `autodedupe` branch
+on:
+  workflow_dispatch:
+    inputs:
+      use_pixels:
+        description: "Also treat identical pixels with different PNG bytes as duplicates"
+        type: boolean
+        default: true
+      dry_run:
+        description: "Scan only: upload the report, delete nothing, push nothing"
+        type: boolean
+        default: false
+      allow_baseline_drift:
+        description: "Continue even if the extractor output differs from the committed assets.py (drift ends up in the commit)"
+        type: boolean
+        default: false
+
+env:
+  UPSTREAM_REPO: LmeSzinc/AzurLaneAutoScript
+  UPSTREAM_BRANCH: master
+  BASE_BRANCH: autodedupe
+  PYTHONPATH: .
+
+permissions:
+  contents: write
+
+concurrency:
+  group: autodedupe
+  cancel-in-progress: false
+
+jobs:
+  dedupe:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    steps:
+      # A PAT in the secret PUSH_TOKEN is optional. Without it GITHUB_TOKEN is used.
+      # Add the PAT only if the push is refused.
+      - name: Checkout fork (full history)
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      # The tooling lives on the fork's default branch; switching to upstream content
+      # below removes it from the working tree, so copy it out first.
+      - name: Stash tooling
+        run: |
+          mkdir -p "$RUNNER_TEMP/tools"
+          cp .github/scripts/find_redundant_assets.py .github/scripts/verify_assets.py "$RUNNER_TEMP/tools/"
+
+      # Builds on the existing `autodedupe` branch if there is one, otherwise on upstream master.
+      # To refresh from a newer upstream, delete the `autodedupe` branch before running.
+      - name: Fetch upstream and choose starting point
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git remote add upstream "https://github.com/${UPSTREAM_REPO}.git"
+          git fetch --no-tags upstream "${UPSTREAM_BRANCH}"
+          if git ls-remote --exit-code --heads origin "${BASE_BRANCH}" >/dev/null 2>&1; then
+            git fetch --no-tags origin "${BASE_BRANCH}"
+            start="origin/${BASE_BRANCH}"
+          else
+            start="upstream/${UPSTREAM_BRANCH}"
+          fi
+          git checkout -B "${BASE_BRANCH}" "$start"
+          echo "Starting from $start at $(git rev-parse --short HEAD)"
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.9"
+
+      # ALAS's requirements.txt targets Python 3.7 with numpy 1.16 and mxnet, far more than
+      # the extractor needs. numpy must stay below 2: with numpy 2 the generated files would
+      # contain "np.int64(...)" in every color tuple.
+      # If the baseline step below fails with ModuleNotFoundError, add that package here.
+      - name: Install extractor dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install "numpy==1.23.5" "opencv-python-headless==4.8.1.78" "pillow<10" \
+            "imageio==2.27.0" tqdm "rich==11.2.0" pyyaml "pydantic==1.10.2" pywebio
+
+      - name: Regenerate baseline assets.py
+        run: python dev_tools/button_extract.py
+
+      - name: Check baseline is clean and snapshot it
+        run: |
+          if ! git diff --quiet -- 'module/*/assets.py'; then
+            {
+              echo "### Baseline drift"
+              echo "The extractor output differs from the committed assets.py before any change:"
+              echo '```'
+              git diff --stat -- 'module/*/assets.py' | tail -n 25
+              echo '```'
+            } >> "$GITHUB_STEP_SUMMARY"
+            if [ "${{ inputs.allow_baseline_drift }}" != "true" ]; then
+              echo "::error::Extractor output differs from committed assets.py (environment or stale files). See the job summary; re-run with allow_baseline_drift to accept it."
+              exit 1
+            fi
+            echo "::warning::Baseline drift accepted; it will be part of the commit."
+          fi
+          mkdir -p "$RUNNER_TEMP/baseline"
+          find module -maxdepth 2 -name assets.py -exec cp --parents {} "$RUNNER_TEMP/baseline" \;
+
+      - name: Scan for duplicates
+        run: |
+          args="--strict-scope --report $RUNNER_TEMP/redundant_assets.txt"
+          if [ "${{ inputs.use_pixels }}" = "true" ]; then args="$args --pixels"; fi
+          if [ "${{ inputs.dry_run }}" != "true" ]; then args="$args --delete"; fi
+          python "$RUNNER_TEMP/tools/find_redundant_assets.py" assets $args | tee "$RUNNER_TEMP/scan.log"
+          { echo "### Scan"; echo '```'; cat "$RUNNER_TEMP/scan.log"; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+
+      # Regenerate and verify; files behind any changed area/color/button are restored and
+      # the loop repeats (verify exits 10 after restoring).
+      - name: Regenerate assets.py and verify
+        if: ${{ !inputs.dry_run }}
+        run: |
+          ok=0
+          for round in 1 2 3; do
+            echo "::group::Round $round"
+            python dev_tools/button_extract.py
+            set +e
+            python "$RUNNER_TEMP/tools/verify_assets.py" \
+              --baseline-dir "$RUNNER_TEMP/baseline" --restore \
+              --json "$RUNNER_TEMP/violations_round_$round.json"
+            rc=$?
+            set -e
+            echo "::endgroup::"
+            if [ "$rc" -eq 0 ]; then ok=1; break; fi
+            if [ "$rc" -ne 10 ]; then echo "::error::Verification failed (exit $rc)"; exit "$rc"; fi
+          done
+          if [ "$ok" -ne 1 ]; then echo "::error::Still failing after 3 rounds"; exit 1; fi
+
+      - name: Collect changes
+        id: changes
+        if: ${{ !inputs.dry_run }}
+        run: |
+          git add -A -- assets 'module/*/assets.py'
+          if git diff --cached --quiet; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            echo "Nothing to do."
+            exit 0
+          fi
+          echo "changed=true" >> "$GITHUB_OUTPUT"
+          for s in en jp tw; do
+            n=$(git diff --cached --diff-filter=D --name-only -- "assets/$s" | wc -l)
+            echo "${s}_files=$n" >> "$GITHUB_OUTPUT"
+          done
+          python - <<'PY' >> "$GITHUB_OUTPUT"
+          import subprocess
+          names = subprocess.run(
+              ["git", "diff", "--cached", "--diff-filter=D", "--name-only", "-z", "--", "assets"],
+              capture_output=True, check=True).stdout.split(b"\0")
+          names = [n for n in names if n]
+          out = subprocess.run(
+              ["git", "cat-file", "--batch-check"],
+              input=b"".join(b"HEAD:" + n + b"\n" for n in names),
+              capture_output=True, check=True).stdout.decode().splitlines()
+          size = sum(int(line.split()[2]) for line in out)
+          print(f"files={len(names)}")
+          print(f"mib={size / 1048576:.2f}")
+          PY
+
+      - name: Commit and push
+        if: ${{ !inputs.dry_run && steps.changes.outputs.changed == 'true' }}
+        run: |
+          git commit -q -m "Remove en/jp/tw assets identical to cn"
+          git push origin "${BASE_BRANCH}"
+          {
+            echo "### Result"
+            echo "Pushed to \`${BASE_BRANCH}\`: removed **${{ steps.changes.outputs.files }}** PNG files (**${{ steps.changes.outputs.mib }} MiB**)."
+            echo ""
+            echo "| server | files removed |"
+            echo "|---|---|"
+            echo "| en | ${{ steps.changes.outputs.en_files }} |"
+            echo "| jp | ${{ steps.changes.outputs.jp_files }} |"
+            echo "| tw | ${{ steps.changes.outputs.tw_files }} |"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload reports
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: dedupe-reports
+          path: |
+            ${{ runner.temp }}/redundant_assets.txt
+            ${{ runner.temp }}/scan.log
+            ${{ runner.temp }}/violations_round_*.json
+          if-no-files-found: ignore

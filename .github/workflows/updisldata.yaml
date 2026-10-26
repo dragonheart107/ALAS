@@ -1,0 +1,135 @@
+name: Update island data
+
+# Runs every Thursday afternoon and can also be started manually. Runs in the fork:
+#   1. takes upstream LmeSzinc/AzurLaneAutoScript master (or the existing `autoisland` branch)
+#   2. checks out the lua data
+#   3. runs dev_tools/island_extractor.py to regenerate module/island/data.py
+#   4. commits the result and pushes it to the `autoisland` branch (only if the file changed)
+on:
+  schedule:
+    - cron: "23 15 * * 4"
+  workflow_dispatch:
+    inputs:
+      lua_repo:
+        description: "Repo holding the lua data (<SERVER>/sharecfg/...), e.g. AzurLaneTools/AzurLaneLuaScripts"
+        type: string
+        default: dragonheart107/AL-Island
+      lua_ref:
+        description: "Branch, tag or commit of the lua data repo"
+        type: string
+        default: main
+      dry_run:
+        description: "Generate only: show the diff in the summary, push nothing"
+        type: boolean
+        default: false
+
+env:
+  UPSTREAM_REPO: LmeSzinc/AzurLaneAutoScript
+  UPSTREAM_BRANCH: master
+  BASE_BRANCH: autoisland
+  # Scheduled runs have no inputs, so the fallbacks after || are what they use.
+  LUA_REPO: ${{ inputs.lua_repo || 'dragonheart107/AL-Island' }}
+  LUA_REF: ${{ inputs.lua_ref || 'main' }}
+  PYTHONPATH: .
+
+permissions:
+  contents: write
+
+concurrency:
+  group: autoisland
+  cancel-in-progress: false
+
+defaults:
+  run:
+    # ALAS is checked out in a subfolder so that the lua data can sit next to it:
+    #   $GITHUB_WORKSPACE/ALAS                 <- cwd, the extractor's "./module/island/data.py"
+    #   $GITHUB_WORKSPACE/AzurLaneLuaScripts   <- the extractor's "../AzurLaneLuaScripts"
+    working-directory: ALAS
+
+jobs:
+  island:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Checkout fork (full history)
+        uses: actions/checkout@v6
+        with:
+          path: ALAS
+          fetch-depth: 0
+
+      - name: Fetch upstream and choose starting point
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git remote add upstream "https://github.com/${UPSTREAM_REPO}.git"
+          git fetch --no-tags upstream "${UPSTREAM_BRANCH}"
+          if git ls-remote --exit-code --heads origin "${BASE_BRANCH}" >/dev/null 2>&1; then
+            git fetch --no-tags origin "${BASE_BRANCH}"
+            start="origin/${BASE_BRANCH}"
+          else
+            start="upstream/${UPSTREAM_BRANCH}"
+          fi
+          git checkout -B "${BASE_BRANCH}" "$start"
+          echo "Starting from $start at $(git rev-parse --short HEAD)"
+
+      - name: Checkout lua data
+        uses: actions/checkout@v6
+        with:
+          repository: ${{ env.LUA_REPO }}
+          ref: ${{ env.LUA_REF }}
+          path: AzurLaneLuaScripts
+          fetch-depth: 1
+          persist-credentials: false
+          sparse-checkout: |
+            CN/sharecfg
+            EN/sharecfg
+            JP/sharecfg
+            TW/sharecfg
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+
+      # dev_tools/utils.py imports tqdm and dev_tools/slpp.py imports six.
+      - name: Install dependencies
+        run: pip install tqdm six
+
+      - name: Run island extractor
+        run: |
+          python dev_tools/island_extractor.py
+          python -m py_compile module/island/data.py
+
+      - name: Check for changes
+        id: changes
+        run: |
+          if [ -z "$(git status --porcelain -- module/island/data.py)" ]; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            echo "### Island data" >> "$GITHUB_STEP_SUMMARY"
+            echo "No changes: module/island/data.py is already up to date." >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+            {
+              echo "### Island data changes"
+              echo '```'
+              git status --short -- module/island/data.py
+              git diff --stat -- module/island/data.py
+              echo '```'
+            } >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Commit and push
+        if: ${{ !inputs.dry_run && steps.changes.outputs.changed == 'true' }}
+        run: |
+          lua_sha=$(git -C ../AzurLaneLuaScripts rev-parse --short HEAD)
+          git add module/island/data.py
+          git commit -q -m "Update island data" -m "Generated from ${LUA_REPO}@${lua_sha}"
+          git push origin "${BASE_BRANCH}"
+          echo "Pushed to \`${BASE_BRANCH}\` (lua data ${LUA_REPO}@${lua_sha})." >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload generated file
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: island-data
+          path: ${{ github.workspace }}/ALAS/module/island/data.py
+          if-no-files-found: ignore
