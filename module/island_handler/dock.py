@@ -1,5 +1,6 @@
 import cv2
 import numpy as np
+import time
 
 from module.base.button import ButtonGrid
 from module.base.decorator import cached_property, del_cached_property
@@ -27,20 +28,25 @@ class IslandDock(IslandUI):
     def is_in_island_dock(self):
         return self.appear(ISLAND_DOCK_CHECK, offset=(0, 20))
 
-    def handle_island_dock_loading(self, timeout=2, min_wait=0.4):
-        """Wait until the dock card area is settled (sort/scroll animation done)."""
+    def handle_island_dock_loading(self, timeout=2, min_wait=0.4, threshold=1.0):
         floor = Timer(min_wait, count=2).start()
         last = None
         stable = 0
+        start = time.time()
         for _ in self.loop(skip_first=False, timeout=timeout):
             image = self.image_crop(ISLAND_DOCK_DETECT_AREA, copy=True)
-            if last is not None and cv2.absdiff(image, last).mean() < 1.0:
+            diff = cv2.absdiff(image, last).mean() if last is not None else -1
+            logger.info(f'dock_settle t={time.time() - start:.2f} diff={diff:.3f} stable={stable}')
+            if last is not None and diff < threshold:
                 stable += 1
             else:
                 stable = 0
             last = image
             if stable >= 2 and floor.reached():
+                logger.info(f'dock_settle done in {time.time() - start:.2f}s')
                 break
+        else:
+            logger.warning(f'dock_settle timed out after {timeout}s')
 
     def _island_dock_quit_check_func(self):
         return not self.appear(ISLAND_DOCK_CHECK, offset=(20, 20))
