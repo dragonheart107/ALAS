@@ -29,13 +29,22 @@ class IslandDock(IslandUI):
         return self.appear(ISLAND_DOCK_CHECK, offset=(0, 20))
 
     def handle_island_dock_loading(self, timeout=2, min_wait=0.4, threshold=0.5):
+        """
+        Wait until the dock card area stops changing (sort / scroll animation done).
+        Logs the frame diffs only when the wait times out, to diagnose slow settles.
+        """
         last = None
         stable = 0
+        diffs = []
         start = time.time()
         for _ in self.loop(skip_first=False, timeout=timeout):
             image = self.image_crop(ISLAND_DOCK_DETECT_AREA, copy=True)
-            diff = cv2.absdiff(image, last).mean() if last is not None else -1
-            if last is not None and diff < threshold:
+            if last is not None:
+                diff = float(cv2.absdiff(image, last).mean())
+                diffs.append(round(diff, 2))
+            else:
+                diff = None
+            if diff is not None and diff < threshold:
                 stable += 1
             else:
                 stable = 0
@@ -43,7 +52,7 @@ class IslandDock(IslandUI):
             if stable >= 2 and time.time() - start >= min_wait:
                 break
         else:
-            logger.warning(f'dock_settle timed out after {timeout}s')
+            logger.warning(f'dock_settle timed out after {timeout}s, diffs={diffs}')
 
     def _island_dock_quit_check_func(self):
         return not self.appear(ISLAND_DOCK_CHECK, offset=(20, 20))
@@ -103,6 +112,7 @@ class IslandDock(IslandUI):
         del_cached_property(self, 'dock_grid')
         if wait_loading:
             self.handle_island_dock_loading()
+        self.device.click_record_clear()
 
     def prev_dock_page(self, wait_loading=True):
         p1, p2 = random_rectangle_vector_opted((0, 250), box=ISLAND_DOCK_DETECT_AREA, padding=-10)
@@ -110,6 +120,7 @@ class IslandDock(IslandUI):
         del_cached_property(self, 'dock_grid')
         if wait_loading:
             self.handle_island_dock_loading()
+        self.device.click_record_clear()
 
     def ensure_dock_page_at_top(self):
         ISLAND_DOCK_DETECT.load_color(self.device.image)
