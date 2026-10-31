@@ -28,22 +28,19 @@ class IslandDock(IslandUI):
     def is_in_island_dock(self):
         return self.appear(ISLAND_DOCK_CHECK, offset=(0, 20))
 
-    def handle_island_dock_loading(self, timeout=2, min_wait=0.4, threshold=1.0):
-        floor = Timer(min_wait, count=2).start()
+    def handle_island_dock_loading(self, timeout=2, min_wait=0.4, threshold=0.5):
         last = None
         stable = 0
         start = time.time()
         for _ in self.loop(skip_first=False, timeout=timeout):
             image = self.image_crop(ISLAND_DOCK_DETECT_AREA, copy=True)
             diff = cv2.absdiff(image, last).mean() if last is not None else -1
-            logger.info(f'dock_settle t={time.time() - start:.2f} diff={diff:.3f} stable={stable}')
             if last is not None and diff < threshold:
                 stable += 1
             else:
                 stable = 0
             last = image
-            if stable >= 2 and floor.reached():
-                logger.info(f'dock_settle done in {time.time() - start:.2f}s')
+            if stable >= 2 and time.time() - start >= min_wait:
                 break
         else:
             logger.warning(f'dock_settle timed out after {timeout}s')
