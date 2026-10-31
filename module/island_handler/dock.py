@@ -1,5 +1,9 @@
+import cv2
+import numpy as np
+
 from module.base.button import ButtonGrid
 from module.base.decorator import cached_property, del_cached_property
+from module.base.timer import Timer
 from module.base.utils import random_rectangle_vector_opted
 from module.island.ui import IslandUI
 from module.island_handler.assets import *
@@ -23,9 +27,19 @@ class IslandDock(IslandUI):
     def is_in_island_dock(self):
         return self.appear(ISLAND_DOCK_CHECK, offset=(0, 20))
 
-    def handle_island_dock_loading(self):
-        for _ in self.loop(timeout=1.5):
-            if self.match_template_color(ISLAND_DOCK_CHARACTER_CONFIRM, offset=(0, 20)):
+    def handle_island_dock_loading(self, timeout=2, min_wait=0.4):
+        """Wait until the dock card area is settled (sort/scroll animation done)."""
+        floor = Timer(min_wait, count=2).start()
+        last = None
+        stable = 0
+        for _ in self.loop(skip_first=False, timeout=timeout):
+            image = self.image_crop(ISLAND_DOCK_DETECT_AREA, copy=True)
+            if last is not None and cv2.absdiff(image, last).mean() < 1.0:
+                stable += 1
+            else:
+                stable = 0
+            last = image
+            if stable >= 2 and floor.reached():
                 break
 
     def _island_dock_quit_check_func(self):
