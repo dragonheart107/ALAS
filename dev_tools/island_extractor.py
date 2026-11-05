@@ -741,10 +741,12 @@ class IslandShopItemExtractor:
     def __init__(self):
         self.item = {}
         self.item_to_recipe_id = {}
-        data = LOADER.load('sharecfg/island_shop_goods.lua', keyword='pg.base.island_shop_goods')
-        for index, item in data.items():
-            if not isinstance(index, int) or index < 100000 or index >= 412000:
-                continue
+
+        # Seed from zh-CN explicitly. Do NOT rely on LOADER.server left over
+        # from a previous extractor (IslandRecipeExtractor leaves it at 'zh-TW',
+        # and the TW bundle can lag behind the CN patch, missing ids like 411029).
+        seed = self.extract_item('zh-CN')
+        for index, item in seed.items():
             self.item[index] = {
                 'name': {
                     'cn': '',
@@ -767,48 +769,25 @@ class IslandShopItemExtractor:
                     'en': None,
                     'jp': None,
                     'tw': None,
-                }
+                },
             }
             for _, itm in item['items'].items():
                 self.item_to_recipe_id[itm[1]] = index
-        
-        for index, item in self.extract_item('zh-CN').items():
-            self.item[index]['name']['cn'] = item['goods_name']
-            time_dict = item['time']
-            if time_dict == 'always':
-                self.item[index]['start_time']['cn'] = 'always'
-                self.item[index]['end_time']['cn'] = 'always'
-            else:
-                self.item[index]['start_time']['cn'] = island_time_to_sql_time(time_dict[0])
-                self.item[index]['end_time']['cn'] = island_time_to_sql_time(time_dict[1])
-        for index, item in self.extract_item('en-US').items():
-            self.item[index]['name']['en'] = item['goods_name']
-            time_dict = item['time']
-            if time_dict == 'always':
-                self.item[index]['start_time']['en'] = 'always'
-                self.item[index]['end_time']['en'] = 'always'
-            else:
-                self.item[index]['start_time']['en'] = island_time_to_sql_time(time_dict[0])
-                self.item[index]['end_time']['en'] = island_time_to_sql_time(time_dict[1])
-        for index, item in self.extract_item('ja-JP').items():
-            self.item[index]['name']['jp'] = item['goods_name']
-            time_dict = item['time']
-            if time_dict == 'always':
-                self.item[index]['start_time']['jp'] = 'always'
-                self.item[index]['end_time']['jp'] = 'always'
-            else:
-                self.item[index]['start_time']['jp'] = island_time_to_sql_time(time_dict[0])
-                self.item[index]['end_time']['jp'] = island_time_to_sql_time(time_dict[1])
-        for index, item in self.extract_item('zh-TW').items():
-            self.item[index]['name']['tw'] = item['goods_name']
-            time_dict = item['time']
-            if time_dict == 'always':
-                self.item[index]['start_time']['tw'] = 'always'
-                self.item[index]['end_time']['tw'] = 'always'
-            else:
-                self.item[index]['start_time']['tw'] = island_time_to_sql_time(time_dict[0])
-                self.item[index]['end_time']['tw'] = island_time_to_sql_time(time_dict[1])
 
+        for lang, key in [('zh-CN', 'cn'), ('en-US', 'en'), ('ja-JP', 'jp'), ('zh-TW', 'tw')]:
+            for index, item in self.extract_item(lang).items():
+                if index not in self.item:
+                    # This server's bundle does not contain this id yet
+                    # (e.g. TW lags behind a CN patch). Leave that language blank.
+                    continue
+                self.item[index]['name'][key] = item['goods_name']
+                time_dict = item['time']
+                if time_dict == 'always':
+                    self.item[index]['start_time'][key] = 'always'
+                    self.item[index]['end_time'][key] = 'always'
+                else:
+                    self.item[index]['start_time'][key] = island_time_to_sql_time(time_dict[0])
+                    self.item[index]['end_time'][key] = island_time_to_sql_time(time_dict[1])
     def extract_item(self, server):
         LOADER.server = server
         data = LOADER.load('sharecfg/island_shop_goods.lua', keyword='pg.base.island_shop_goods')
