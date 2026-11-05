@@ -407,6 +407,11 @@ class IslandWildGatherExtractor:
             4030: 8,
             4031: 4,
             4032: 8,
+            # 990029 winter event (added 2026-11)
+            4043: 4,   # 梅花
+            4044: 8,   # 水仙花
+            4045: 12,  # 冬菇
+            4046: 4,   # 马蹄
         }
         self.gather = {}
         LOADER.server = 'zh-CN'
@@ -415,6 +420,16 @@ class IslandWildGatherExtractor:
             if not isinstance(index, int):
                 continue
             item_id = int(item['icon'].split('_')[-1])
+            if item_id not in item_id_to_count:
+                # New seasonal event adds new crops. Don't crash the whole
+                # extractor; skip this gather and log it so item_id_to_count
+                # can be updated. See DIC_ISLAND_WILD_GATHER for what's missing.
+                print(
+                    f'[IslandWildGatherExtractor] skipping gather {index} '
+                    f'({item["name"]}): unknown item id {item_id}, '
+                    f'add it to item_id_to_count'
+                )
+                continue
             self.gather[index] = {
                 'activity_id': item['activity_id'],
                 'product': {item_id: item_id_to_count[item_id]},
