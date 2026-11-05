@@ -18,6 +18,14 @@ on:
         description: "Branch, tag or commit of the lua data repo"
         type: string
         default: main
+      extractor_source:
+        description: "Which island_extractor.py to run"
+        type: choice
+        options:
+          - fork
+          - origin_main
+          - upstream
+        default: fork
       dry_run:
         description: "Generate only: show the diff in the summary, push nothing"
         type: boolean
@@ -30,6 +38,7 @@ env:
   # Scheduled runs have no inputs, so the fallbacks after || are what they use.
   LUA_REPO: ${{ inputs.lua_repo || 'dragonheart107/AL-Island' }}
   LUA_REF: ${{ inputs.lua_ref || 'main' }}
+  EXTRACTOR_SOURCE: ${{ inputs.extractor_source || 'fork' }}
   PYTHONPATH: .
 
 permissions:
@@ -63,6 +72,7 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git remote add upstream "https://github.com/${UPSTREAM_REPO}.git"
           git fetch --no-tags upstream "${UPSTREAM_BRANCH}"
+          git fetch --no-tags origin main
           if git ls-remote --exit-code --heads origin "${BASE_BRANCH}" >/dev/null 2>&1; then
             git fetch --no-tags origin "${BASE_BRANCH}"
             start="origin/${BASE_BRANCH}"
@@ -71,6 +81,23 @@ jobs:
           fi
           git checkout -B "${BASE_BRANCH}" "$start"
           echo "Starting from $start at $(git rev-parse --short HEAD)"
+
+      - name: Select island_extractor.py
+        run: |
+          case "${EXTRACTOR_SOURCE}" in
+            upstream)
+              echo "Using dev_tools/island_extractor.py from upstream/${UPSTREAM_BRANCH}"
+              git show "upstream/${UPSTREAM_BRANCH}:dev_tools/island_extractor.py" > dev_tools/island_extractor.py
+              ;;
+            origin_main)
+              echo "Using dev_tools/island_extractor.py from origin/main"
+              git show "origin/main:dev_tools/island_extractor.py" > dev_tools/island_extractor.py
+              ;;
+            fork|*)
+              echo "Using dev_tools/island_extractor.py from ${BASE_BRANCH} (this checkout)"
+              ;;
+          esac
+          git log -1 --format='extractor last touched by %h %s' -- dev_tools/island_extractor.py
 
       - name: Checkout lua data
         uses: actions/checkout@v6
@@ -110,6 +137,7 @@ jobs:
             echo "changed=true" >> "$GITHUB_OUTPUT"
             {
               echo "### Island data changes"
+              echo "Extractor source: \`${EXTRACTOR_SOURCE}\`"
               echo '```'
               git status --short -- module/island/data.py
               git diff --stat -- module/island/data.py
@@ -122,9 +150,11 @@ jobs:
         run: |
           lua_sha=$(git -C ../AzurLaneLuaScripts rev-parse --short HEAD)
           git add module/island/data.py
-          git commit -q -m "Update island data" -m "Generated from ${LUA_REPO}@${lua_sha}"
+          # Only commit module/island/data.py; the extractor overwrite (if any)
+          # is intentionally left unstaged so it never reaches autoisland.
+          git commit -q -m "Update island data" -m "Generated from ${LUA_REPO}@${lua_sha} with extractor=${EXTRACTOR_SOURCE}"
           git push origin "${BASE_BRANCH}"
-          echo "Pushed to \`${BASE_BRANCH}\` (lua data ${LUA_REPO}@${lua_sha})." >> "$GITHUB_STEP_SUMMARY"
+          echo "Pushed to \`${BASE_BRANCH}\` (lua data ${LUA_REPO}@${lua_sha}, extractor ${EXTRACTOR_SOURCE})." >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload generated file
         if: always()
