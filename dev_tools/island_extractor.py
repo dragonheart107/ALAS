@@ -443,10 +443,10 @@ class IslandWildGatherExtractor:
             4031: 4,
             4032: 8,
             # 990029 winter event (added 2026-11)
-            4043: 4,   # 梅花
-            4044: 8,   # 水仙花
+            4043: 8,   # 梅花
+            4044: 24,   # 水仙花
             4045: 12,  # 冬菇
-            4046: 4,   # 马蹄
+            4046: 12,   # 马蹄
         }
         self.gather = {}
         LOADER.server = 'zh-CN'
