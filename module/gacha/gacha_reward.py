@@ -150,12 +150,15 @@ class RewardGacha(GachaUI, Retirement):
         self.gacha_bottom_navbar_ensure(right=3, is_build=True)
 
         # Transition to 'target_pool' if needed, update
-        # 'target_pool' appropriately
+        # 'target_pool' and config appropriately
         if target_pool == 'wishing_well':
             if self._gacha_side_navbar.get_total(main=self) != 5:
                 logger.warning('\'wishing_well\' is not available, '
                                'default to \'light\' pool')
                 target_pool = 'light'
+                self.config.cross_set(keys=f'Gacha.Gacha.Amount', value= 1)
+                self.config.cross_set(keys=f'Gacha.Gacha.Pool', value= 'light')
+                self.config.load()
             else:
                 self.gacha_side_navbar_ensure(upper=2)
                 if self.appear(BUILD_WW_CHECK):
@@ -168,6 +171,10 @@ class RewardGacha(GachaUI, Retirement):
                 logger.warning('\'event\' is not available, default '
                                'to \'light\' pool')
                 target_pool = 'light'
+                self.config.cross_set(keys=f'Gacha.Gacha.Amount', value= 1)
+                self.config.cross_set(keys=f'Gacha.Gacha.Pool', value= 'light')
+                self.config.load()
+
             else:
                 self.gacha_bottom_navbar_ensure(left=1, is_build=True)
         elif target_pool in ['heavy', 'special']:

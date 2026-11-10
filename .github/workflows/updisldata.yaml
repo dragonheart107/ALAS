@@ -1,0 +1,168 @@
+name: Update island data
+
+# Runs every Thursday afternoon and can also be started manually.
+#
+# The autoisland branch is a pure build artifact: it is always reset to the
+# current upstream/master, then module/island/data.py is regenerated and
+# committed on top. If autoisland exists, it is reset to upstream/master
+# (force-pushed); it is never used as a starting point.
+on:
+  schedule:
+    - cron: "23 15 * * 4"
+  workflow_dispatch:
+    inputs:
+      lua_repo:
+        description: "Repo holding the lua data (<SERVER>/sharecfg/...), e.g. AzurLaneTools/AzurLaneLuaScripts"
+        type: string
+        default: dragonheart107/AL-Island
+      lua_ref:
+        description: "Branch, tag or commit of the lua data repo"
+        type: string
+        default: main
+      extractor_source:
+        description: "Which dev_tools/island_extractor.py to run"
+        type: choice
+        options:
+          - origin_main
+          - upstream
+        default: origin_main
+      dry_run:
+        description: "Generate only: show the diff in the summary, push nothing"
+        type: boolean
+        default: false
+
+env:
+  UPSTREAM_REPO: LmeSzinc/AzurLaneAutoScript
+  UPSTREAM_BRANCH: master
+  BASE_BRANCH: autoisland
+  LUA_REPO: ${{ inputs.lua_repo || 'dragonheart107/AL-Island' }}
+  LUA_REF: ${{ inputs.lua_ref || 'main' }}
+  EXTRACTOR_SOURCE: ${{ inputs.extractor_source || 'origin_main' }}
+  PYTHONPATH: .
+
+permissions:
+  contents: write
+
+concurrency:
+  group: autoisland
+  cancel-in-progress: false
+
+defaults:
+  run:
+    # ALAS is checked out in a subfolder so that the lua data can sit next to it:
+    #   $GITHUB_WORKSPACE/ALAS                 <- cwd, the extractor's "./module/island/data.py"
+    #   $GITHUB_WORKSPACE/AzurLaneLuaScripts   <- the extractor's "../AzurLaneLuaScripts"
+    working-directory: ALAS
+
+jobs:
+  island:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Checkout fork (full history)
+        uses: actions/checkout@v6
+        with:
+          path: ALAS
+          fetch-depth: 0
+
+      - name: Fetch upstream and origin/main
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git remote add upstream "https://github.com/${UPSTREAM_REPO}.git"
+          git fetch --no-tags upstream "${UPSTREAM_BRANCH}"
+          git fetch --no-tags origin main
+
+      - name: Reset autoisland to current upstream/master
+        run: |
+          # Always start from the current upstream master, never from an
+          # existing autoisland branch. This makes autoisland a pure build
+          # artifact of "upstream/master + regenerated data.py".
+          git checkout -B "${BASE_BRANCH}" "upstream/${UPSTREAM_BRANCH}"
+          echo "Baselined ${BASE_BRANCH} on upstream/${UPSTREAM_BRANCH} at $(git rev-parse --short HEAD)"
+
+      - name: Select island_extractor.py
+        run: |
+          case "${EXTRACTOR_SOURCE}" in
+            upstream)
+              echo "Using dev_tools/island_extractor.py from upstream/${UPSTREAM_BRANCH}"
+              git show "upstream/${UPSTREAM_BRANCH}:dev_tools/island_extractor.py" > dev_tools/island_extractor.py
+              ;;
+            origin_main|*)
+              echo "Using dev_tools/island_extractor.py from origin/main"
+              git show "origin/main:dev_tools/island_extractor.py" > dev_tools/island_extractor.py
+              ;;
+          esac
+          git log -1 --format='extractor last touched by %h %s' -- dev_tools/island_extractor.py
+
+      - name: Checkout lua data
+        uses: actions/checkout@v6
+        with:
+          repository: ${{ env.LUA_REPO }}
+          ref: ${{ env.LUA_REF }}
+          path: AzurLaneLuaScripts
+          fetch-depth: 1
+          persist-credentials: false
+          sparse-checkout: |
+            CN/sharecfg
+            EN/sharecfg
+            JP/sharecfg
+            TW/sharecfg
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+
+      # dev_tools/utils.py imports tqdm and dev_tools/slpp.py imports six.
+      - name: Install dependencies
+        run: pip install tqdm six
+
+      - name: Run island extractor
+        run: |
+          python dev_tools/island_extractor.py
+          python -m py_compile module/island/data.py
+
+      - name: Check for changes
+        id: changes
+        run: |
+          # Compare module/island/data.py in the working tree against
+          # upstream/master's version. If autoisland already had a different
+          # data.py, we still want to report "changed" (because the branch is
+          # being reset), unless the regenerated file is byte-identical to
+          # upstream/master's.
+          if git diff --quiet "upstream/${UPSTREAM_BRANCH}" -- module/island/data.py; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            echo "### Island data" >> "$GITHUB_STEP_SUMMARY"
+            echo "No changes: regenerated module/island/data.py matches upstream/${UPSTREAM_BRANCH}." >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+            {
+              echo "### Island data changes"
+              echo "Extractor source: \`${EXTRACTOR_SOURCE}\`"
+              echo "Base: \`upstream/${UPSTREAM_BRANCH}\`"
+              echo '```'
+              git status --short -- module/island/data.py
+              git diff --stat "upstream/${UPSTREAM_BRANCH}" -- module/island/data.py
+              echo '```'
+            } >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Commit and push
+        if: ${{ !inputs.dry_run && steps.changes.outputs.changed == 'true' }}
+        run: |
+          lua_sha=$(git -C ../AzurLaneLuaScripts rev-parse --short HEAD)
+          upstream_sha=$(git rev-parse --short "upstream/${UPSTREAM_BRANCH}")
+          git add module/island/data.py
+          git commit -q -m "Update island data"
+          # Force-push: autoisland is a build artifact, not a branch that
+          # accumulates history. Each run rewrites it from upstream master.
+          git push --force-with-lease origin "${BASE_BRANCH}"
+          echo "Force-pushed \`${BASE_BRANCH}\` (base upstream@${upstream_sha}, lua ${LUA_REPO}@${lua_sha}, extractor ${EXTRACTOR_SOURCE})." >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload generated file
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: island-data
+          path: ${{ github.workspace }}/ALAS/module/island/data.py
+          if-no-files-found: ignore
