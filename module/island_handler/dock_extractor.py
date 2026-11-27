@@ -54,6 +54,20 @@ def clean_character_name(raw_name):
 
 
 class IslandDockTemplateExtractor(IslandDock):
+    def island_dock_scroll_to_top(self, limit=30):
+        """
+        Upstream removed ensure_dock_page_at_top, drag back until the grid is at its top origin.
+
+        Returns:
+            bool: If the dock is at the top.
+        """
+        for _ in range(limit):
+            if self.island_dock_at_top():
+                return True
+            self.prev_dock_page()
+        logger.warning('Failed to scroll the dock to the top')
+        return False
+
     def extract_character_templates(self, folder_path=TEMPLATE_FOLDER):
         """
         Must start in the dock selection page.
@@ -130,13 +144,15 @@ class IslandDockTemplateExtractor(IslandDock):
 
         # Unknown cards are what this tool looks for, so the search can't report a complete scan.
         # Every page waits for identity recognition to settle, which takes a few seconds on new cards.
+        # island_dock_search starts from the current page, so go to the top first
+        self.island_dock_scroll_to_top()
         self.island_dock_search(
-            handle_page, descending=True, start_at_top=True, timeout=1800,
+            handle_page, descending=True, timeout=1800,
             disabled=('emotion', 'emotion_limit', 'grade'))
 
         logger.info(f'Extracted {stats["extracted"]} new templates, skipped {stats["skipped"]} existing')
         logger.info(f'Templates saved to: {folder_path}')
-        self.ensure_dock_page_at_top()
+        self.island_dock_scroll_to_top()
         return stats
 
 
